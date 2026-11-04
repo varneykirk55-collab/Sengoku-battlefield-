@@ -7,6 +7,8 @@ signal player_spawned(soldier: Soldier)
 
 const SOLDIER_SCENE := preload("res://scenes/soldier.tscn")
 
+## &"battlefield" (the M3 map) or &"test_ground" (flat test field used by some tests).
+@export var map: StringName = &"battlefield"
 @export var player_faction := 0
 @export var respawn_delay := 5.0
 ## M2 test range: idle enemy soldiers to cut and shoot (replaced by the AI armies in M4).
@@ -39,11 +41,10 @@ func _ready() -> void:
 	player_spawned.emit(player)
 
 
-## Builds the map. M1 uses a simple test ground; M3 replaces it with the battlefield.
 func _build_field() -> Node3D:
-	var ground := PrototypeGround.new()
-	ground.name = "Field"
-	return ground
+	var f: Node3D = PrototypeGround.new() if map == &"test_ground" else Battlefield.new()
+	f.name = "Field"
+	return f
 
 
 func spawn_soldier(faction: int, as_player: bool = false, loadout: Array[StringName] = PLAYER_LOADOUT) -> Soldier:
@@ -77,6 +78,8 @@ func spawn_transform(faction: int) -> Transform3D:
 
 ## Idle enemies (and one ally) at several ranges; they come back a few seconds after dying.
 func _spawn_training_targets() -> void:
+	# Placed in front of the player's spawn, whichever map is loaded.
+	var origin := player.global_position
 	var spots := [
 		[1, Vector3(0, 0, -12), [&"katana"]], [1, Vector3(3, 0, -14), [&"katana"]],
 		[1, Vector3(-8, 0, -30), [&"matchlock", &"katana"]], [1, Vector3(10, 0, -55), [&"matchlock", &"katana"]],
@@ -87,12 +90,20 @@ func _spawn_training_targets() -> void:
 		loadout.assign(spot[2])
 		var s := spawn_soldier(spot[0], false, loadout)
 		s.display_name = "Training enemy" if spot[0] != player_faction else "Ally"
-		var home := Transform3D(Basis(Vector3.UP, 0.0 if spot[0] == player_faction else PI), spot[1] + Vector3(0, 0.3, 0))
+		var pos: Vector3 = origin + spot[1] * Vector3(1, 0, 1)
+		pos.y = _ground_height(pos) + 0.3
+		var home := Transform3D(Basis(Vector3.UP, 0.0 if spot[0] == player_faction else PI), pos)
 		s.respawn_at(home)
 		s.died.connect(func(dead: Soldier, _k: Node) -> void:
 			get_tree().create_timer(4.0, false).timeout.connect(func() -> void:
 				if is_instance_valid(dead):
 					dead.respawn_at(home)))
+
+
+func _ground_height(p: Vector3) -> float:
+	if field is Battlefield:
+		return (field as Battlefield).height_at(p.x, p.z)
+	return 0.0
 
 
 func _on_player_died(_s: Soldier, killer: Node) -> void:
@@ -110,8 +121,10 @@ func _respawn_player() -> void:
 
 func _start_audio() -> void:
 	Music.play(&"battle", 3.0)
-	ambience.append(AudioManager.start_loop(&"amb_wind_loop", null, -6.0, 3.0))
-	ambience.append(AudioManager.start_loop(&"amb_field_loop", null, -2.0, 3.0))
+	var amb := AmbienceDirector.new()
+	amb.name = "Ambience"
+	add_child(amb)
+	ambience = amb.beds
 	AudioManager.play(&"match_start")
 
 

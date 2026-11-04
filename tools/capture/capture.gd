@@ -63,5 +63,27 @@ func _setup(inst: Node, step: String) -> void:
 			print("[capture] body_fwd=", p.body_forward(), " look=", p.look_direction(), " aim_dir=", p.visual.gun_aim_dir,
 				" mount_y=", p.visual.gun_mount.global_basis.y, " muzzle-mount=", (mz - p.visual.gun_mount.global_position).normalized(),
 				" model parent=", gun.model.get_parent().name, " model local=", gun.model.transform)
+		"nofog":
+			for we in battle.find_children("*", "WorldEnvironment", true, false):
+				(we as WorldEnvironment).environment.fog_enabled = false
+		"aerial":  # high camera over the south camp looking north across the whole field
+			var cam := Camera3D.new()
+			battle.add_child(cam)
+			cam.far = 1000.0
+			cam.global_position = Vector3(0, 150, 230)
+			cam.look_at(Vector3(0, 0, -20))
+			cam.current = true
+			battle.hud.visible = false
+		"topdown":
+			var cam2 := Camera3D.new()
+			battle.add_child(cam2)
+			cam2.far = 1000.0
+			cam2.global_position = Vector3(0, 330, 0.01)
+			cam2.look_at(Vector3.ZERO, Vector3.FORWARD)
+			cam2.current = true
+			battle.hud.visible = false
+		"at_b":
+			battle.player.respawn_at(Transform3D(Basis(Vector3.UP, PI * 0.8), (battle.field as Battlefield).ground_point(-12, 18) + Vector3(0, 0.3, 0)))
+			(battle.player.controller as PlayerController)._yaw = PI * 0.85
 		"wait":
 			await get_tree().create_timer(0.5).timeout

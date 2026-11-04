@@ -14,8 +14,8 @@ placeholder for now.
 | M0 | Project, input (keyboard/mouse + gamepad), six audio buses, AudioManager, music, settings, tests, CI | **Done**, see [testing](docs/TESTING.md) |
 | M1 | Player: cameras, movement, health, death/respawn | **Done** |
 | M2 | Katana + matchlock, weapon switching, combat audio, Windows build | **Done** |
-| M3 | Prototype battlefield, spawns, A/B/C, navmesh, ambience | Next |
-| M4 | AI armies 16v16 with squads, battle audio, Windows build | |
+| M3 | Prototype battlefield, spawns, A/B/C, navmesh, ambience | **Done** |
+| M4 | AI armies 16v16 with squads, battle audio, Windows build | Next |
 | M5 | Conquest: tickets, HUD, match end | |
 | M6 | Profiling, fixes, Windows release | |
 

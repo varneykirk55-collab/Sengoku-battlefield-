@@ -66,3 +66,16 @@
   along the line of sight, slung on the back, AI soldiers' procedural weapons.
 - Windows build: `SengokuBattlefield-M2-Windows.zip` exported. Not launched on Windows.
 - Not verified: combat feel, hit-stop and camera shake strength, audio balance.
+
+### M3 — 2026-11-04
+
+- 50/50 tests pass. New (battlefield): objectives A, B, C on the ground and neutral, B on the hill;
+  both camps have 5 grounded spawn points at opposite ends; the player spawns in the south camp and
+  runs across the terrain; navigation paths exist from both camps to every objective; the saved
+  navmesh matches the current layout (re-bake guard); capture points count living soldiers only;
+  the map boundary stops the player; wind and field beds play and birds call from the trees.
+- Navmesh: 4,404 polygons covering ~63,400 m2 of ~67,700 m2; baked offline in ~0.2 s.
+- Finding: Godot 4.7 syncs large navigation regions asynchronously, so AI must tolerate
+  "no path yet" for the first moments of a match.
+- Screenshots checked: aerial and top-down layout (A farmstead, B hilltop torii, C river outpost,
+  stream, treelines, camps), ground views from the spawn and the hill.

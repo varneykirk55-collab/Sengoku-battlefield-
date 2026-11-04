@@ -41,3 +41,13 @@ Original Kengeki and ASHIGARU repositories are reference-only; reused code is co
   The matchlock rides the rig's `musket_ctrl` bone and is turned onto the line of sight when
   shouldered (the Rōnin aim clip holds it ~30 degrees off).
 - `FX` autoload: pooled tracers, muzzle flash + smoke, blood, dust, sparks, hit-stop.
+
+## Battlefield (M3)
+
+- `Battlefield` builds the map deterministically from code: 240 x 300 m heightmap (central hill
+  under B, ridge, stream valley, edge berms), objectives A/B/C (`CapturePoint`), faction camps
+  with spawn markers, and primitive cover (rocks, palisades, stone walls, huts, torii, pines).
+- Navigation: `tools/bake_navmesh.sh` bakes `data/maps/battlefield_nav.res` offline; a test fails
+  if the layout changes without a re-bake.
+- `AmbienceDirector`: wind and field beds, birds from the treeline, gusts.
+- `Battle.map` selects `battlefield` (default) or `test_ground` (flat field used by some tests).

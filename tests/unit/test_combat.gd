@@ -9,6 +9,7 @@ var heard: Array[StringName] = []
 func before_each() -> void:
 	battle = load("res://scenes/battle.tscn").instantiate()
 	battle.training_targets = false
+	battle.map = &"test_ground"
 	add_child(battle)
 	player = battle.player
 	AudioManager.sound_played.connect(_on_sound)
