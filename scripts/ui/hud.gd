@@ -24,13 +24,13 @@ var _flash := 0.0
 func _ready() -> void:
 	layer = 5
 	root = Control.new()
-	root.set_anchors_preset(Control.PRESET_FULL_RECT)
+	root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	root.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.theme = UIStyle.make_theme()
 	add_child(root)
 
 	damage_flash = ColorRect.new()
-	damage_flash.set_anchors_preset(Control.PRESET_FULL_RECT)
+	damage_flash.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	damage_flash.color = Color(0.6, 0.0, 0.0, 0.0)
 	damage_flash.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.add_child(damage_flash)
@@ -77,7 +77,7 @@ func _ready() -> void:
 	Events.damage_dealt.connect(_on_damage_dealt)
 	Events.soldier_killed.connect(_on_killed)
 
-	hint = UIStyle.label("LMB/RMB attack · Q switch · R reload · V camera · F2 hurt self · Esc", 14, UIStyle.MUTED)
+	hint = UIStyle.label("LMB/RMB attack · Q switch · R reload · V camera · Tab score · Esc", 14, UIStyle.MUTED)
 	hint.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT)
 	hint.offset_left = -700
 	hint.offset_top = -32

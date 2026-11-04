@@ -104,3 +104,17 @@
   GPU cost (32 skinned Rōnin at ~94k triangles each) can only be measured on the owner's PC.
 - Screenshots checked: armies marching out of camp, fighting at objective C.
 - Windows build: `SengokuBattlefield-M4-Windows.zip`. Not launched on Windows.
+
+### M5 — 2026-11-04
+
+- 72/72 tests pass. New (conquest): the player captures a neutral point in ~12 s with capture
+  ticks, a "Capturing" bar and the captured cue; three soldiers capture in ~8 s; any enemy
+  presence contests (no progress, contested cue, HUD says contested); an enemy point is
+  neutralised (double speed) and then captured; losing a point plays the lost cue; deaths cost
+  tickets; holding more points bleeds the enemy at 0.25 per point of difference per second; the
+  conch warning at low tickets; defeat at zero tickets (end screen DEFEAT, defeat music, input
+  off); victory (VICTORY screen and music); the HUD shows tickets and A/B/C and Tab shows the
+  scoreboard; respawning at a held point; **complete AI-vs-AI conquest matches reach a winner**.
+- Simulated default match (150 tickets at the time): faction 0 won after 248 s, 195 kills,
+  7 captures. Starting tickets raised to 250 (~7 minutes); tune in `data/battle/default_battle.tres`.
+- Screenshots checked: ticket strip, A/B/C chips, contested capture bar, scoreboard.

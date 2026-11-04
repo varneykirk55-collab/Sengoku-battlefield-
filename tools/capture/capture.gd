@@ -110,5 +110,18 @@ func _setup(inst: Node, step: String) -> void:
 			(p.controller as PlayerController)._yaw = atan2(-to.x, -to.z)
 			(p.controller as PlayerController)._pitch = -0.12
 			print("[capture] watching ", best.objective_id, " with ", most, " soldiers inside")
+		"onpoint":  # stand on the busiest point (shows the capture bar)
+			var best: CapturePoint = null
+			var most := -1
+			for cp in battle.director.objectives:
+				var c := cp.soldiers_inside()
+				if c[0] + c[1] > most:
+					most = c[0] + c[1]
+					best = cp
+			battle.player.respawn_at(Transform3D(Basis.IDENTITY, best.global_position + Vector3(3, 0.4, 3)))
+			battle.player.health.max_health = 1e9
+			battle.player.health.restore_full()
+		"score":
+			Input.action_press("scoreboard")
 		"wait":
 			await get_tree().create_timer(0.5).timeout

@@ -16,8 +16,8 @@ placeholder for now.
 | M2 | Katana + matchlock, weapon switching, combat audio, Windows build | **Done** |
 | M3 | Prototype battlefield, spawns, A/B/C, navmesh, ambience | **Done** |
 | M4 | AI armies 16v16 with squads, battle audio, Windows build | **Done** |
-| M5 | Conquest: tickets, HUD, match end | Next |
-| M6 | Profiling, fixes, Windows release | |
+| M5 | Conquest: tickets, HUD, match end | **Done** |
+| M6 | Profiling, fixes, Windows release | Next |
 
 ## Running
 

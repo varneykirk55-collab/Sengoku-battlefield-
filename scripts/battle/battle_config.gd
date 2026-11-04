@@ -22,7 +22,7 @@ extends Resource
 @export var ai_respawn_delay := 6.0
 
 @export_group("Conquest")
-@export var starting_tickets := 150
+@export var starting_tickets := 250
 ## Ticket bleed per second when one faction holds more objectives (per objective of difference).
 @export var bleed_per_point := 0.25
 ## Seconds for one soldier to capture a neutral point; more soldiers capture faster.
@@ -31,4 +31,4 @@ extends Resource
 @export var capture_bonus_per_soldier := 0.25
 @export var capture_max_multiplier := 2.5
 ## Tickets at which the low-tickets warning sounds.
-@export var ticket_warning_at := 30
+@export var ticket_warning_at := 50

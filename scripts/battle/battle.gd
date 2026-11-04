@@ -23,6 +23,8 @@ static var next_setup: Dictionary = {}
 
 var field: Node3D
 var director: BattleDirector
+var conquest: ConquestMode
+var conquest_hud: ConquestHUD
 var player: Soldier
 var hud: HUD
 var pause_menu: PauseMenu
@@ -49,6 +51,17 @@ func _ready() -> void:
 		points = (field as Battlefield).objectives
 	director.setup(self, config, points)
 	add_child(director)
+	if not points.is_empty():
+		conquest = ConquestMode.new()
+		conquest.name = "Conquest"
+		conquest.setup(self, config, points, player_faction)
+		add_child(conquest)
+		conquest.match_over.connect(_on_match_over)
+		conquest_hud = ConquestHUD.new()
+		hud.root.add_child(conquest_hud)
+		conquest_hud.setup(conquest, self, player_faction)
+		conquest_hud.fight_again.connect(_restart)
+		conquest_hud.return_to_menu.connect(_quit_to_menu)
 	player = spawn_soldier(player_faction, true)
 	hud.bind_player(player)
 	player.died.connect(_on_player_died)
@@ -104,6 +117,23 @@ func spawn_transform(faction: int, index: int = -1) -> Transform3D:
 	return Transform3D(p.global_basis, pos)
 
 
+func match_is_over() -> bool:
+	return conquest != null and conquest.over
+
+
+## Where a fallen soldier returns: half the time at a point their side holds safely (if any),
+## otherwise at their camp.
+func reinforcement_transform(faction: int, index: int, prefer_forward: bool = false) -> Transform3D:
+	if conquest and (prefer_forward or randf() < 0.5):
+		var fwd: Variant = conquest.forward_spawn(faction)
+		if fwd is Vector3:
+			var pos: Vector3 = fwd
+			pos.y = _ground_height(pos) + 0.4
+			var to_enemy := spawn_transform(1 - faction, 0).origin - pos
+			return Transform3D(Basis(Vector3.UP, atan2(-to_enemy.x, -to_enemy.z)), pos)
+	return spawn_transform(faction, index)
+
+
 ## Both AI armies: config.soldiers_per_faction per side (the player counts on their side).
 func _spawn_armies() -> void:
 	for f in 2:
@@ -123,8 +153,8 @@ func _spawn_armies() -> void:
 			var slot := soldiers.size()
 			s.died.connect(func(dead: Soldier, _k: Node) -> void:
 				get_tree().create_timer(config.ai_respawn_delay, false).timeout.connect(func() -> void:
-					if is_instance_valid(dead) and not dead.alive:
-						dead.respawn_at(spawn_transform(dead.faction, slot))))
+					if is_instance_valid(dead) and not dead.alive and not match_is_over():
+						dead.respawn_at(reinforcement_transform(dead.faction, slot))))
 	director.build_squads()
 
 
@@ -164,9 +194,9 @@ func _on_player_died(_s: Soldier, killer: Node) -> void:
 
 
 func _respawn_player() -> void:
-	if not is_instance_valid(player):
+	if not is_instance_valid(player) or match_is_over():
 		return
-	player.respawn_at(spawn_transform(player.faction))
+	player.respawn_at(reinforcement_transform(player.faction, randi() % 16, true))
 	AudioManager.play(&"respawn")
 	hud.hide_death()
 
@@ -181,7 +211,33 @@ func _start_audio() -> void:
 	AudioManager.play(&"match_start")
 
 
+func _on_match_over(winner: int) -> void:
+	# A short slow-motion beat, then the result screen.
+	(player.controller as PlayerController).input_enabled = false
+	hud.hide_death()
+	Engine.time_scale = 0.35
+	Music.play_stinger(&"victory" if winner == player_faction else &"defeat", &"menu")
+	get_tree().create_timer(1.2, true, false, true).timeout.connect(func() -> void:
+		Engine.time_scale = 1.0
+		director.process_mode = Node.PROCESS_MODE_DISABLED
+		for ai in director.ais:
+			if is_instance_valid(ai):
+				ai.process_mode = Node.PROCESS_MODE_DISABLED
+				ai.soldier.move_dir = Vector3.ZERO
+		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+		conquest_hud.show_end(winner))
+
+
+func _restart() -> void:
+	Engine.time_scale = 1.0
+	Battle.next_setup = {"map": map, "ai_armies": ai_armies}
+	AudioManager.stop_all_loops(0.3)
+	AudioManager.stop_world_sounds()
+	get_tree().change_scene_to_file("res://scenes/battle.tscn")
+
+
 func _quit_to_menu() -> void:
+	Engine.time_scale = 1.0
 	get_tree().paused = false
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	AudioManager.stop_all_loops(0.3)

@@ -14,10 +14,10 @@ func _ready() -> void:
 		_selfcheck()
 		return
 	theme = UIStyle.make_theme()
-	set_anchors_preset(Control.PRESET_FULL_RECT)
+	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	var bg := ColorRect.new()
 	bg.color = Color(0.07, 0.055, 0.055)
-	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
+	bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(bg)
 	var sun := ColorRect.new()  # simple rising-sun band behind the title
 	sun.color = Color(UIStyle.VERMILION, 0.18)
@@ -49,7 +49,7 @@ func _ready() -> void:
 	_menu.add_child(UIStyle.button("Quit", func(): AudioManager.quit_game(), &"ui_back"))
 
 	_panel_holder = CenterContainer.new()
-	_panel_holder.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_panel_holder.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_panel_holder.visible = false
 	add_child(_panel_holder)
 

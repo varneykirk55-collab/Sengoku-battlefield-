@@ -32,9 +32,15 @@ func _ready() -> void:
 	var presence := {&"A": [0, 0], &"B": [0, 0], &"C": [0, 0]}
 	var t0 := Time.get_ticks_msec()
 	var steps := int(secs * 60.0)
+	var captures := [0]
+	Events.objective_captured.connect(func(_cp: Node, _f: int) -> void: captures[0] += 1)
+	var ended_at := -1.0
 	var last := Time.get_ticks_usec()
 	for i in steps:
 		await get_tree().physics_frame
+		if ended_at < 0.0 and battle.conquest and battle.conquest.over:
+			ended_at = i / 60.0
+			break
 		var now := Time.get_ticks_usec()
 		var ms := (now - last) / 1000.0  # whole frame on the CPU (headless: no rendering)
 		last = now
@@ -57,6 +63,9 @@ func _ready() -> void:
 		orders["%d:%s" % [sq.faction, sq.objective.objective_id if sq.objective else "-"]] = orders.get("%d:%s" % [sq.faction, sq.objective.objective_id if sq.objective else "-"], 0) + 1
 	print("[sim] %d v %d for %.0f s simulated in %.1f s wall" % [per_side, per_side, secs, wall])
 	print("[sim] kills by faction 0: %d, faction 1: %d" % kills)
+	if battle.conquest:
+		print("[sim] conquest: captures %d, tickets %d : %d, %s" % [captures[0], battle.conquest.ticket_count(0), battle.conquest.ticket_count(1),
+			("faction %d won after %.0f s" % [battle.conquest.winner, ended_at]) if ended_at >= 0.0 else "still going"])
 	print("[sim] squads -> objectives: %s" % orders)
 	print("[sim] avg soldiers present per sample (f0,f1): %s" % presence)
 	print("[sim] soldiers that never left camp alive: %d / %d" % [never_left, battle.soldiers.size() - 1])

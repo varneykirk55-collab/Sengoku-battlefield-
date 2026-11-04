@@ -68,3 +68,14 @@ Original Kengeki and ASHIGARU repositories are reference-only; reused code is co
 - `AmbienceDirector` battle beds: combat noise near the listener raises the crowd bed, far away
   the distant-battle bed.
 - AI soldiers respawn at their camp after `ai_respawn_delay` (tickets arrive in M5).
+
+## Conquest (M5)
+
+- `ConquestMode` updates every 0.1 s: per-point progress -1..1 (faction 1 .. faction 0), capture
+  speed scales with headcount (+25% per extra soldier, max 2.5x), neutralising runs at double
+  speed, any enemy presence contests. Deaths cost one ticket; the side holding fewer points
+  bleeds `bleed_per_point` per point of difference per second. Zero tickets ends the match.
+- Reinforcements: AI respawn at a safely held point half the time, otherwise at camp; the player
+  prefers a held point.
+- `ConquestHUD`: tickets, A/B/C strip, capture bar, Tab scoreboard, victory / defeat screen with
+  Fight again / Return to menu. The match ends with a short slow-motion beat and a music stinger.
