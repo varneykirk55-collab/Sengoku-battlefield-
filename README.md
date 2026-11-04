@@ -15,13 +15,15 @@ placeholder for now.
 | M1 | Player: cameras, movement, health, death/respawn | **Done** |
 | M2 | Katana + matchlock, weapon switching, combat audio, Windows build | **Done** |
 | M3 | Prototype battlefield, spawns, A/B/C, navmesh, ambience | **Done** |
-| M4 | AI armies 16v16 with squads, battle audio, Windows build | Next |
-| M5 | Conquest: tickets, HUD, match end | |
+| M4 | AI armies 16v16 with squads, battle audio, Windows build | **Done** |
+| M5 | Conquest: tickets, HUD, match end | Next |
 | M6 | Profiling, fixes, Windows release | |
 
 ## Running
 
 **From source:** install Godot 4.7.2 Standard (not .NET), import `project.godot`, press F5.
+
+**AI battle report / profiling:** `SIM_SECONDS=60 SIM_SOLDIERS=16 tools/sim.sh`
 
 **Tests (headless):** `tools/test.sh` (downloads Godot 4.7.2 to `~/.cache/sengoku` on first run).
 

@@ -43,6 +43,7 @@ func _ready() -> void:
 		_play_button.disabled = true
 		_play_button.tooltip_text = "The battlefield arrives in a later milestone."
 	_menu.add_child(_play_button)
+	_menu.add_child(UIStyle.button("Training Range", _on_training, &"ui_confirm"))
 	_menu.add_child(UIStyle.button("Settings", _open.bind(SettingsPanel)))
 	_menu.add_child(UIStyle.button("Sound Test", _open.bind(SoundTestPanel)))
 	_menu.add_child(UIStyle.button("Quit", func(): AudioManager.quit_game(), &"ui_back"))
@@ -69,6 +70,8 @@ func _selfcheck() -> void:
 	print("[selfcheck] sound events with audio: %d/%d" % [with_audio, AudioManager.events.size()])
 	print("[selfcheck] music tracks: %s" % ", ".join(Music.tracks.keys().map(func(k): return String(k))))
 	var battle: Battle = load(BATTLE_SCENE).instantiate()
+	battle.ai_armies = false
+	battle.training_targets = true
 	get_tree().root.add_child.call_deferred(battle)
 	await get_tree().process_frame
 	for i in 30:
@@ -101,6 +104,23 @@ func _selfcheck() -> void:
 	var shot := target.health.current < before or not target.alive
 	print("[selfcheck] matchlock shot landed: %s; audio stats: %s" % [shot, AudioManager.stats])
 	ok = ok and cut and shot and AudioManager.stats.played > 10
+	battle.queue_free()
+	await get_tree().process_frame
+	# Phase 2: a short 16 v 16 battle between the AI armies.
+	var war: Battle = load(BATTLE_SCENE).instantiate()
+	get_tree().root.add_child.call_deferred(war)
+	await get_tree().process_frame
+	(war.player.controller as PlayerController).input_enabled = false
+	war.player.health.max_health = 1e9
+	war.player.health.restore_full()
+	var kills := [0]
+	Events.soldier_killed.connect(func(_v: Node, k: Node) -> void:
+		if k is Soldier:
+			kills[0] += 1)
+	for i in 30 * 60:
+		await get_tree().physics_frame
+	print("[selfcheck] AI battle: %d soldiers, %d kills in 30 s" % [war.soldiers.size(), kills[0]])
+	ok = ok and war.soldiers.size() == 32 and kills[0] > 0
 	print("[selfcheck] %s" % ("PASS" if ok else "FAIL"))
 	AudioManager.quit_game(0 if ok else 1)
 
@@ -118,6 +138,14 @@ func _exit_tree() -> void:
 
 func _on_play() -> void:
 	Music.stop(1.0)
+	Battle.next_setup = {}
+	get_tree().change_scene_to_file(BATTLE_SCENE)
+
+
+## Weapons practice: flat test field, idle enemies at several ranges, no armies.
+func _on_training() -> void:
+	Music.stop(1.0)
+	Battle.next_setup = {"map": &"test_ground", "ai_armies": false, "training_targets": true}
 	get_tree().change_scene_to_file(BATTLE_SCENE)
 
 

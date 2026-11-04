@@ -1,0 +1,21 @@
+[gd_resource type="Resource" script_class="BattleConfig" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/battle/battle_config.gd" id="1_cfg"]
+
+[resource]
+script = ExtResource("1_cfg")
+soldiers_per_faction = 16
+ranged_fraction = 0.4
+squad_size = 4
+ai_think_hz = 5.0
+squad_reassign_interval = 4.0
+max_player_attackers = 2
+ai_skill = 0.55
+player_respawn_delay = 5.0
+ai_respawn_delay = 6.0
+starting_tickets = 150
+bleed_per_point = 0.25
+capture_time = 12.0
+capture_bonus_per_soldier = 0.25
+capture_max_multiplier = 2.5
+ticket_warning_at = 30

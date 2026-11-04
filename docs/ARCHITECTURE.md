@@ -51,3 +51,20 @@ Original Kengeki and ASHIGARU repositories are reference-only; reused code is co
   if the layout changes without a re-bake.
 - `AmbienceDirector`: wind and field beds, birds from the treeline, gusts.
 - `Battle.map` selects `battlefield` (default) or `test_ground` (flat field used by some tests).
+
+## AI armies (M4)
+
+- `BattleConfig` (`data/battle/default_battle.tres`): army size, ranged share, squad size, think
+  rate, player attack tokens, AI skill, respawn delays, conquest rules.
+- `BattleDirector`: spatial grid (12 m cells) rebuilt every 3 frames; staggered thinking
+  (`ai_think_hz` per AI, spread across frames); squads of 4 reassigned every 4 s by objective value
+  (unowned / threatened / enemy-held) with diminishing returns per extra squad; line-of-sight
+  rays only for the best 3 candidates; max 2 AI on the player in melee; animation and shadow LOD
+  by camera distance.
+- `AIController`: ADVANCE (NavigationAgent3D path, straight-line fallback while navigation is
+  still syncing), HOLD (slot around the objective), MELEE (close in, 1-3 cut combos, heavy cuts,
+  pauses, side-steps), RANGED (aim time by skill and distance, distance-based aim error, reload,
+  katana when rushed). Separation from nearby allies, stuck detection with sidesteps.
+- `AmbienceDirector` battle beds: combat noise near the listener raises the crowd bed, far away
+  the distant-battle bed.
+- AI soldiers respawn at their camp after `ai_respawn_delay` (tickets arrive in M5).

@@ -10,12 +10,19 @@ const SOLDIER_SCENE := preload("res://scenes/soldier.tscn")
 ## &"battlefield" (the M3 map) or &"test_ground" (flat test field used by some tests).
 @export var map: StringName = &"battlefield"
 @export var player_faction := 0
-@export var respawn_delay := 5.0
-## M2 test range: idle enemy soldiers to cut and shoot (replaced by the AI armies in M4).
-@export var training_targets := true
+@export var config: BattleConfig = preload("res://data/battle/default_battle.tres")
+## Spawns both AI armies (16 v 16 by default).
+@export var ai_armies := true
+## Test range: idle enemy soldiers to cut and shoot (used when ai_armies is off).
+@export var training_targets := false
+var respawn_delay := 5.0
 const PLAYER_LOADOUT: Array[StringName] = [&"katana", &"matchlock"]
 
+## Options for the next battle scene load (set by the main menu before changing scene).
+static var next_setup: Dictionary = {}
+
 var field: Node3D
+var director: BattleDirector
 var player: Soldier
 var hud: HUD
 var pause_menu: PauseMenu
@@ -24,6 +31,9 @@ var ambience: Array[Node] = []
 
 
 func _ready() -> void:
+	for key in next_setup:
+		set(key, next_setup[key])
+	next_setup = {}
 	field = _build_field()
 	add_child(field)
 	hud = HUD.new()
@@ -31,10 +41,21 @@ func _ready() -> void:
 	pause_menu = PauseMenu.new()
 	add_child(pause_menu)
 	pause_menu.quit_to_menu.connect(_quit_to_menu)
+	respawn_delay = config.player_respawn_delay
+	director = BattleDirector.new()
+	director.name = "Director"
+	var points: Array[CapturePoint] = []
+	if field is Battlefield:
+		points = (field as Battlefield).objectives
+	director.setup(self, config, points)
+	add_child(director)
 	player = spawn_soldier(player_faction, true)
 	hud.bind_player(player)
 	player.died.connect(_on_player_died)
-	if training_targets:
+	director.register(player)
+	if ai_armies:
+		_spawn_armies()
+	elif training_targets:
 		_spawn_training_targets()
 	_start_audio()
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
@@ -52,7 +73,7 @@ func spawn_soldier(faction: int, as_player: bool = false, loadout: Array[StringN
 	s.faction = faction
 	s.is_player = as_player
 	s.name = ("Player" if as_player else "Soldier_%d_%d" % [faction, soldiers.size()])
-	var xform := spawn_transform(faction)
+	var xform := spawn_transform(faction, soldiers.size())
 	s.look_yaw = xform.basis.get_euler().y
 	add_child(s)
 	s.global_position = xform.origin
@@ -66,14 +87,45 @@ func spawn_soldier(faction: int, as_player: bool = false, loadout: Array[StringN
 	return s
 
 
-## A spawn point for a faction, with a little scatter so soldiers don't stack.
-func spawn_transform(faction: int) -> Transform3D:
+## A spawn point for a faction. `index` spreads soldiers over the points and around each one so
+## a whole army can appear at once without overlapping.
+func spawn_transform(faction: int, index: int = -1) -> Transform3D:
 	var points := get_tree().get_nodes_in_group("spawn_%d" % faction)
 	if points.is_empty():
 		return Transform3D(Basis.IDENTITY, Vector3(0, 1, 0))
-	var p: Node3D = points[randi() % points.size()]
-	var offset := Vector3(randf_range(-3, 3), 0.5, randf_range(-3, 3))
-	return Transform3D(p.global_basis, p.global_position + offset)
+	if index < 0:
+		index = randi() % 64
+	var p: Node3D = points[index % points.size()]
+	var ring := index / points.size()
+	var a := float(ring) * 2.4 + float(index) * 0.7
+	var offset := Vector3(cos(a), 0.0, sin(a)) * (1.6 * float(ring % 4)) + Vector3(randf_range(-0.3, 0.3), 0.0, randf_range(-0.3, 0.3))
+	var pos := p.global_position + offset
+	pos.y = _ground_height(pos) + 0.4
+	return Transform3D(p.global_basis, pos)
+
+
+## Both AI armies: config.soldiers_per_faction per side (the player counts on their side).
+func _spawn_armies() -> void:
+	for f in 2:
+		var count := config.soldiers_per_faction - (1 if f == player_faction else 0)
+		var ranged := roundi(count * config.ranged_fraction)
+		for i in count:
+			var loadout: Array[StringName] = [&"katana"]
+			if i < ranged:
+				loadout = [&"matchlock", &"katana"]
+			var s := spawn_soldier(f, false, loadout)
+			s.display_name = ("Teppo ashigaru" if i < ranged else "Ashigaru") + (" (ally)" if f == player_faction else "")
+			var ai := AIController.new()
+			ai.name = "AI"
+			ai.skill = clampf(config.ai_skill + randf_range(-0.15, 0.15), 0.1, 1.0)
+			s.add_child(ai)
+			director.register(s)
+			var slot := soldiers.size()
+			s.died.connect(func(dead: Soldier, _k: Node) -> void:
+				get_tree().create_timer(config.ai_respawn_delay, false).timeout.connect(func() -> void:
+					if is_instance_valid(dead) and not dead.alive:
+						dead.respawn_at(spawn_transform(dead.faction, slot))))
+	director.build_squads()
 
 
 ## Idle enemies (and one ally) at several ranges; they come back a few seconds after dying.
@@ -103,7 +155,7 @@ func _spawn_training_targets() -> void:
 func _ground_height(p: Vector3) -> float:
 	if field is Battlefield:
 		return (field as Battlefield).height_at(p.x, p.z)
-	return 0.0
+	return p.y if p.y > 0.0 else 0.0
 
 
 func _on_player_died(_s: Soldier, killer: Node) -> void:
@@ -123,6 +175,7 @@ func _start_audio() -> void:
 	Music.play(&"battle", 3.0)
 	var amb := AmbienceDirector.new()
 	amb.name = "Ambience"
+	amb.battle_beds = ai_armies
 	add_child(amb)
 	ambience = amb.beds
 	AudioManager.play(&"match_start")

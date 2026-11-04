@@ -57,3 +57,30 @@ func _scenes(dir: String) -> Array[String]:
 	for sub in DirAccess.get_directories_at(dir):
 		out.append_array(_scenes(dir.path_join(sub)))
 	return out
+
+
+func test_menu_offers_battle_and_training_range() -> void:
+	var menu: Control = load("res://scenes/main_menu.tscn").instantiate()
+	add_child(menu)
+	await frames(2)
+	var labels: Array[String] = []
+	for c in menu._menu.get_children():
+		if c is Button:
+			labels.append(c.text)
+	check(labels.has("Enter the Battle") and labels.has("Training Range"), "battle and training options (%s)" % [labels])
+	menu.queue_free()
+	await frames(1)
+	Music.stop(0.0)
+
+
+func test_battle_setup_options_apply() -> void:
+	Battle.next_setup = {"map": &"test_ground", "ai_armies": false, "training_targets": true}
+	var b: Battle = load("res://scenes/battle.tscn").instantiate()
+	add_child(b)
+	await physics_frames(3)
+	check(b.field is PrototypeGround, "training range uses the test ground")
+	check(b.soldiers.size() == 6, "player plus five training targets (%d)" % b.soldiers.size())
+	check(Battle.next_setup.is_empty(), "options are consumed")
+	b.queue_free()
+	await frames(2)
+	Music.stop(0.0)

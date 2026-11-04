@@ -85,5 +85,30 @@ func _setup(inst: Node, step: String) -> void:
 		"at_b":
 			battle.player.respawn_at(Transform3D(Basis(Vector3.UP, PI * 0.8), (battle.field as Battlefield).ground_point(-12, 18) + Vector3(0, 0.3, 0)))
 			(battle.player.controller as PlayerController)._yaw = PI * 0.85
+		"godmode":
+			battle.player.health.max_health = 1e9
+			battle.player.health.restore_full()
+			(battle.player.controller as PlayerController).input_enabled = false
+		"fast":  # let the armies meet (software rendering is slow, so speed time up)
+			Engine.time_scale = 4.0
+			await get_tree().create_timer(40.0, true, false, false).timeout
+			Engine.time_scale = 1.0
+		"watch":  # stand near the busiest objective and look at it
+			var best: CapturePoint = null
+			var most := -1
+			for cp in battle.director.objectives:
+				var c := cp.soldiers_inside()
+				if c[0] + c[1] > most:
+					most = c[0] + c[1]
+					best = cp
+			var p := battle.player
+			var dir := Vector3(0.6, 0, 1).normalized()
+			p.respawn_at(Transform3D(Basis.IDENTITY, (battle.field as Battlefield).ground_point(best.global_position.x + dir.x * 16, best.global_position.z + dir.z * 16) + Vector3(0, 0.4, 0)))
+			p.health.max_health = 1e9
+			p.health.restore_full()
+			var to := best.global_position - p.global_position
+			(p.controller as PlayerController)._yaw = atan2(-to.x, -to.z)
+			(p.controller as PlayerController)._pitch = -0.12
+			print("[capture] watching ", best.objective_id, " with ", most, " soldiers inside")
 		"wait":
 			await get_tree().create_timer(0.5).timeout

@@ -79,3 +79,28 @@
   "no path yet" for the first moments of a match.
 - Screenshots checked: aerial and top-down layout (A farmstead, B hilltop torii, C river outpost,
   stream, treelines, camps), ground views from the spawn and the hill.
+
+### M4 — 2026-11-04
+
+- 60/60 tests pass, three consecutive runs. New (AI): 16 v 16 with matchlock ashigaru on both
+  sides and every AI in a squad, squads spread over A, B and C; after 40 s soldiers are fighting
+  over the objectives and nobody is stuck in camp; an AI swordsman closes in and kills an enemy;
+  an AI marksman fires at a target 40 m away and draws the katana when rushed; never more than two
+  AI fight the player in melee at once; in a full battle soldiers fall and reinforcements return,
+  distant volleys are heard from camp, close fighting is heard up close (cuts, death cries),
+  the battle intensity raises the battle beds, and soldiers shout as they charge; distant soldiers
+  animate at a reduced rate. Training Range menu option and setup options.
+- Packaged-build self-check (Linux twin): training-range cut and shot land; a 30 s 16 v 16 AI
+  battle runs inside the exported game (32 soldiers, 14 kills). PASS.
+- Headless CPU cost per frame (2-core cloud VM, no rendering, 40 s battles):
+
+  | Soldiers | Avg | Worst | Kills / 40 s |
+  |---|---|---|---|
+  | 16 v 16 | 2.2 ms | 5.2 ms | 25 |
+  | 32 v 32 | 4.1 ms | 15.6 ms | 42 |
+  | 64 v 64 | 8.0 ms | 22.2 ms | 72 |
+
+  CPU scales roughly linearly; the occasional spikes at 32 v 32+ are investigated in M6.
+  GPU cost (32 skinned Rōnin at ~94k triangles each) can only be measured on the owner's PC.
+- Screenshots checked: armies marching out of camp, fighting at objective C.
+- Windows build: `SengokuBattlefield-M4-Windows.zip`. Not launched on Windows.
