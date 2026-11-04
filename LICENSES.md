@@ -7,6 +7,9 @@
   objective cues, conch horn, music). Blade clash/block sounds (`TEMP_*_kengeki_*`) are
   procedurally generated placeholders copied from the owner's Kengeki project. No recordings or
   third-party sample libraries are used. All of it is temporary and meant to be replaced.
+- **Rōnin character** (`assets/characters/ronin/`) and **Katana** (`assets/weapons/Katana.glb`): the
+  owner's supplied models, copied unchanged from ASHIGARU for use as placeholders. The Rōnin's kimono
+  tint and the sashimono banners are applied at runtime; the source files are not modified.
 - **Engine**: Godot 4.7.2, MIT License. https://godotengine.org/license/
 
 Kengeki and ASHIGARU were only read from; nothing in those repositories was changed.

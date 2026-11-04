@@ -13,6 +13,9 @@ extends Node
 ##   * when every voice is busy, the least important voice (low priority, far away) is stolen,
 ##     and a new sound that is less important than everything playing is dropped.
 
+## Emitted for every sound that actually starts (tests and debugging listen to this).
+signal sound_played(id: StringName, position: Variant)
+
 const BUSES: Array[StringName] = [&"Master", &"Music", &"Ambience", &"SFX", &"UI", &"Voice"]
 const POOL_3D := 40
 const POOL_2D := 16
@@ -150,6 +153,7 @@ func play(id: StringName, position: Variant = null, volume_offset_db: float = 0.
 	_voices[player] = {"player": player, "event": id, "priority": ev.priority, "distance": distance, "end": _clock + length + 0.05}
 	_last_played[id] = _clock
 	stats.played += 1
+	sound_played.emit(id, position)
 	return player
 
 

@@ -34,3 +34,15 @@
 - Not verified: audio heard by a person, the Windows `.exe` launching.
 - Known headless-only noise: Godot reports a few audio playbacks "still in use at exit" when run
   headless (the dummy audio driver never runs the mixer that releases them). Tests are unaffected.
+
+### M1 — 2026-11-04
+
+- 27/27 tests pass. New (player, driven through real input actions): battle spawns the player on the
+  ground with the third-person camera, battle music and ambience; forward input runs in the camera
+  direction with footsteps; sprint is clearly faster than running; jump height and landing sound;
+  first-person toggle at eye height with head meshes hidden; damage with hurt sound and HUD update;
+  death (death cry, body fall, corpse stops colliding, outside view, death panel, no movement) and
+  respawn after the delay (full health, respawn cue, first-person preference restored); falling out
+  of the world kills; an upper-body slash plays while running; pause menu pauses and resumes.
+- Screenshots checked: third person, first person, facing, faction banners, running slash layering.
+- Not verified: how movement and cameras feel with a real mouse/gamepad.

@@ -12,8 +12,8 @@ placeholder for now.
 | Milestone | Contents | State |
 |---|---|---|
 | M0 | Project, input (keyboard/mouse + gamepad), six audio buses, AudioManager, music, settings, tests, CI | **Done**, see [testing](docs/TESTING.md) |
-| M1 | Player: cameras, movement, health, death/respawn | Next |
-| M2 | Katana + matchlock, weapon switching, combat audio, Windows build | |
+| M1 | Player: cameras, movement, health, death/respawn | **Done** |
+| M2 | Katana + matchlock, weapon switching, combat audio, Windows build | Next |
 | M3 | Prototype battlefield, spawns, A/B/C, navmesh, ambience | |
 | M4 | AI armies 16v16 with squads, battle audio, Windows build | |
 | M5 | Conquest: tickets, HUD, match end | |
@@ -43,6 +43,7 @@ finds all of its audio. The Windows `.exe` itself cannot be launched in the clou
 | Switch weapon | Q or mouse wheel (1 / 2 direct) | Y (D-pad left/right direct) |
 | Third / first person | V | D-pad up |
 | Scoreboard / Pause | Tab / Esc | Back / Start |
+| Debug: hurt yourself (prototype only) | F2 | — |
 
 ## Layout
 
