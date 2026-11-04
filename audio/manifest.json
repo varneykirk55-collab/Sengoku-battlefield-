@@ -1,0 +1,193 @@
+{
+ "amb_bird": [
+  1.125,
+  1.012,
+  1.32,
+  1.54,
+  1.21,
+  1.6
+ ],
+ "amb_field_loop": [
+  27.88
+ ],
+ "amb_gust": [
+  4.5
+ ],
+ "amb_wind_loop": [
+  23.88
+ ],
+ "battle_crowd_loop": [
+  19.88
+ ],
+ "battle_cry": [
+  1.018,
+  0.747,
+  1.114,
+  0.772,
+  1.262,
+  1.349,
+  1.018,
+  1.007
+ ],
+ "battle_distant_loop": [
+  29.88
+ ],
+ "blade_block": [
+  "kengeki:block_00.wav",
+  "kengeki:block_01.wav"
+ ],
+ "blade_clash": [
+  "kengeki:clash_00.wav",
+  "kengeki:clash_01.wav",
+  "kengeki:clash_02.wav"
+ ],
+ "body_fall": [
+  0.7
+ ],
+ "bullet_hit_flesh": [
+  1.1,
+  1.1
+ ],
+ "bullet_hit_ground": [
+  1.1,
+  1.1,
+  1.1
+ ],
+ "bullet_hit_wood": [
+  1.1,
+  1.1,
+  1.1
+ ],
+ "bullet_whiz": [
+  0.5,
+  0.5,
+  0.5
+ ],
+ "capture_tick": [
+  0.5
+ ],
+ "death_cry": [
+  1.477,
+  1.343,
+  1.494
+ ],
+ "footstep": [
+  0.5,
+  0.5,
+  0.5,
+  0.5,
+  0.5
+ ],
+ "hit_marker": [
+  0.35
+ ],
+ "hurt": [
+  0.281,
+  0.281,
+  0.291
+ ],
+ "katana_draw": [
+  1.52,
+  1.52
+ ],
+ "katana_hit": [
+  0.45,
+  0.45,
+  0.45
+ ],
+ "katana_hit_world": [
+  0.9,
+  0.9,
+  0.9
+ ],
+ "katana_swing_heavy": [
+  0.367,
+  0.358,
+  0.419
+ ],
+ "katana_swing_light": [
+  0.26,
+  0.26,
+  0.26
+ ],
+ "kill_marker": [
+  0.8
+ ],
+ "land": [
+  0.75,
+  0.75
+ ],
+ "match_start": [
+  2.8
+ ],
+ "matchlock_dry": [
+  0.25
+ ],
+ "matchlock_fire": [
+  2.245,
+  2.296,
+  2.329
+ ],
+ "matchlock_fire_far": [
+  3.413,
+  3.365,
+  3.388
+ ],
+ "music_battle": 31.99,
+ "music_defeat": 4.0,
+ "music_menu": 47.88,
+ "music_victory": 4.4,
+ "objective_captured": [
+  2.2
+ ],
+ "objective_contested": [
+  0.5
+ ],
+ "objective_lost": [
+  2.2
+ ],
+ "reload_ball": [
+  0.85,
+  0.85
+ ],
+ "reload_match": [
+  0.55,
+  0.55
+ ],
+ "reload_powder": [
+  0.75,
+  0.75
+ ],
+ "reload_prime": [
+  0.6,
+  0.6
+ ],
+ "reload_ram": [
+  0.9,
+  0.9
+ ],
+ "respawn": [
+  0.9
+ ],
+ "ticket_warning": [
+  3.4
+ ],
+ "ui_back": [
+  0.5
+ ],
+ "ui_click": [
+  0.5
+ ],
+ "ui_confirm": [
+  0.5
+ ],
+ "ui_hover": [
+  0.5
+ ],
+ "weapon_lower": [
+  0.36
+ ],
+ "weapon_raise": [
+  0.42
+ ]
+}

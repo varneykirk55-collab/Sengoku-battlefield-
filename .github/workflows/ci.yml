@@ -1,0 +1,46 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      export_windows:
+        description: "Also build the Windows zip"
+        type: boolean
+        default: false
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/sengoku
+          key: godot-4.7.2
+      - name: Run headless tests
+        run: tools/test.sh
+
+  windows-build:
+    if: github.event_name == 'workflow_dispatch' && inputs.export_windows
+    needs: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/sengoku
+            ~/.local/share/godot/export_templates
+          key: godot-4.7.2-templates
+      - name: Export Windows build
+        run: tools/export_windows.sh ci-${{ github.run_number }}
+      - name: Verify packaged content (Linux twin of the Windows build)
+        run: tools/verify_export.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: SengokuBattlefield-Windows
+          path: dist/*.zip
