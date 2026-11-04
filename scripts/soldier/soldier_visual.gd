@@ -20,6 +20,15 @@ const FIRST_PERSON_HIDDEN_LAYER := 2
 const BANNER_COLORS := [Color(0.78, 0.12, 0.1), Color(0.12, 0.28, 0.75)]
 const KIMONO_TINTS := [Color(1.0, 0.78, 0.74), Color(0.74, 0.82, 1.0)]
 
+const P_LOCO := &"parameters/loco/blend_position"
+const P_LOCO_SPEED := &"parameters/loco_speed/scale"
+const P_AIM := &"parameters/aim_blend/blend_amount"
+const P_STANCE := &"parameters/stance_mix/blend_amount"
+const P_ACTION_SPEED := &"parameters/action_speed/scale"
+const P_ONESHOT := &"parameters/oneshot/request"
+## Soldiers beyond this distance are not drawn (fog hides them anyway).
+const DRAW_DISTANCE := 260.0
+
 static var _library: AnimationLibrary
 static var _upper_paths: Array[NodePath] = []
 static var _kimono_materials: Dictionary = {}
@@ -48,6 +57,8 @@ var dead := false
 var update_interval := 0.0
 
 var _accum := 0.0
+var _last_gait := -1.0
+var _last_scale := -1.0
 var _action_end := 0.0
 var _time := 0.0
 
@@ -72,6 +83,11 @@ func setup(faction: int) -> void:
 	add_child(gun_mount)
 	_gun_bone = skeleton.find_bone("musket_ctrl")
 	_apply_faction(faction)
+	for mi in skeleton.get_children():
+		if mi is MeshInstance3D:
+			(mi as MeshInstance3D).visibility_range_end = DRAW_DISTANCE
+			(mi as MeshInstance3D).visibility_range_end_margin = 20.0
+			(mi as MeshInstance3D).visibility_range_fade_mode = GeometryInstance3D.VISIBILITY_RANGE_FADE_SELF
 
 
 ## Ground speed in m/s drives the walk/run blend and leg playback rate.
@@ -79,13 +95,17 @@ func set_locomotion(speed: float, grounded: bool) -> void:
 	if dead or tree == null:
 		return
 	var gait := clampf(speed / 2.4, 0.0, 1.0) if speed < 2.4 else 1.0 + clampf((speed - 2.4) / 2.0, 0.0, 1.0)
-	tree.set("parameters/loco/blend_position", gait)
+	if absf(gait - _last_gait) > 0.01:
+		_last_gait = gait
+		tree.set(P_LOCO, gait)
 	var scale := 1.0
 	if speed > 0.1:
 		scale = clampf(speed / 1.4, 0.7, 1.6) if speed < 2.4 else clampf(speed / 2.6, 1.0, 2.4)
 	if not grounded:
 		scale = 0.25  # hang in the stride while airborne (no jump clip on the placeholder rig)
-	tree.set("parameters/loco_speed/scale", scale)
+	if absf(scale - _last_scale) > 0.01:
+		_last_scale = scale
+		tree.set(P_LOCO_SPEED, scale)
 
 
 ## Upper-body stance held while moving: &"katana" (blade ready), &"matchlock" (gun shouldered)
@@ -94,8 +114,8 @@ func set_stance(kind: StringName) -> void:
 	stance = kind
 	if tree == null:
 		return
-	tree.set("parameters/aim_blend/blend_amount", 0.0 if kind == &"none" else 1.0)
-	tree.set("parameters/stance_mix/blend_amount", 1.0 if kind == &"matchlock" else 0.0)
+	tree.set(P_AIM, 0.0 if kind == &"none" else 1.0)
+	tree.set(P_STANCE, 1.0 if kind == &"matchlock" else 0.0)
 
 
 ## Shoulders the matchlock (kept for tools/tests).
@@ -113,14 +133,14 @@ func play_action(action: StringName, duration: float) -> void:
 	var node := (tree.tree_root as AnimationNodeBlendTree).get_node(&"action") as AnimationNodeAnimation
 	node.animation = clip
 	var length := anim.get_animation(clip).length
-	tree.set("parameters/action_speed/scale", length / maxf(duration, 0.05))
-	tree.set("parameters/oneshot/request", AnimationNodeOneShot.ONE_SHOT_REQUEST_FIRE)
+	tree.set(P_ACTION_SPEED, length / maxf(duration, 0.05))
+	tree.set(P_ONESHOT, AnimationNodeOneShot.ONE_SHOT_REQUEST_FIRE)
 	_action_end = _time + duration
 
 
 func cancel_action() -> void:
 	if tree:
-		tree.set("parameters/oneshot/request", AnimationNodeOneShot.ONE_SHOT_REQUEST_FADE_OUT)
+		tree.set(P_ONESHOT, AnimationNodeOneShot.ONE_SHOT_REQUEST_FADE_OUT)
 
 
 func is_action_playing() -> bool:
@@ -145,6 +165,8 @@ func reset() -> void:
 	anim.stop()
 	tree.active = true
 	set_stance(stance)
+	_last_gait = -1.0
+	_last_scale = -1.0
 	set_locomotion(0.0, true)
 	tree.advance(0.0)
 
@@ -163,7 +185,16 @@ func set_cast_shadows(on: bool) -> void:
 			mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON if on else GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 
 
+static var prof_anim_us := 0
+
+
 func _process(delta: float) -> void:
+	var t0 := Time.get_ticks_usec()
+	_process_body(delta)
+	prof_anim_us += Time.get_ticks_usec() - t0
+
+
+func _process_body(delta: float) -> void:
 	_time += delta
 	_accum += delta
 	if _accum < update_interval:

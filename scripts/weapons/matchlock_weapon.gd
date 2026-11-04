@@ -161,6 +161,7 @@ func _fire() -> void:
 		return
 	loaded = false
 	shots_fired += 1
+	soldier.protected_for = 0.0
 	var aim: Array = holder.aim_ray()  # [origin, direction] chosen by the controller
 	var origin: Vector3 = aim[0]
 	var dir: Vector3 = _apply_spread(aim[1], spread())

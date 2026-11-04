@@ -42,6 +42,9 @@ var speed_scale := 1.0
 ## Yaw forced by an attack in progress (NAN = none).
 var facing_override := NAN
 
+## Physics level of detail, set by the BattleDirector: far-away soldiers who aren't fighting
+## move every other physics frame (at double step), halving their character-controller cost.
+var half_rate_physics := false
 var controller: Node = null
 var health: HealthComponent
 var visual: SoldierVisual
@@ -50,6 +53,9 @@ var alive := true
 var is_player := false
 var kills := 0
 var deaths := 0
+## Seconds of protection after (re)spawning; attacking ends it early.
+const SPAWN_PROTECTION := 2.0
+var protected_for := 0.0
 
 var _gravity: float = ProjectSettings.get_setting("physics/3d/default_gravity")
 var _stride := 0.0
@@ -58,12 +64,14 @@ var _air_time := 0.0
 var _body_yaw := 0.0
 var _impulse := Vector3.ZERO
 var _move_vel := Vector3.ZERO
+var _half_frame := false
 
 
 func _ready() -> void:
 	collision_layer = LAYER_SOLDIERS
 	collision_mask = LAYER_WORLD | LAYER_SOLDIERS
 	floor_snap_length = 0.35
+	max_slides = 4
 	floor_max_angle = deg_to_rad(50.0)
 	health = $Health as HealthComponent
 	health.died.connect(_on_health_died)
@@ -90,13 +98,24 @@ func push(v: Vector3) -> void:
 	_impulse += v
 
 
+static var prof_move_us := 0
+static var prof_slide_us := 0
+
+
 func _physics_process(delta: float) -> void:
+	var t0 := Time.get_ticks_usec()
+	_physics_body(delta)
+	prof_move_us += Time.get_ticks_usec() - t0
+
+
+func _physics_body(delta: float) -> void:
 	if not alive:
 		velocity.x = move_toward(velocity.x, 0.0, acceleration * delta)
 		velocity.z = move_toward(velocity.z, 0.0, acceleration * delta)
 		velocity.y -= _gravity * delta
 		move_and_slide()
 		return
+	protected_for = maxf(0.0, protected_for - delta)
 	_move(delta)
 	_turn(delta)
 	_body_sounds(delta)
@@ -127,7 +146,16 @@ func _move(delta: float) -> void:
 	else:
 		velocity.y -= _gravity * delta
 	wants_jump = false
-	move_and_slide()
+	var t0 := Time.get_ticks_usec()
+	if half_rate_physics:
+		_half_frame = not _half_frame
+		if _half_frame:
+			velocity *= 2.0  # cover two frames' distance in one step
+			move_and_slide()
+			velocity *= 0.5
+	else:
+		move_and_slide()
+	prof_slide_us += Time.get_ticks_usec() - t0
 
 
 func _turn(delta: float) -> void:
@@ -145,14 +173,16 @@ func _turn(delta: float) -> void:
 
 func _body_sounds(delta: float) -> void:
 	var on_floor := is_on_floor()
+	var audible := AudioManager.listener_position().distance_squared_to(global_position) < 900.0  # 30 m
 	if on_floor:
 		var speed := Vector2(velocity.x, velocity.z).length()
 		_stride += speed * delta
 		var stride_len := 1.9 if speed > run_speed + 0.5 else 1.5
 		if speed > 0.8 and _stride >= stride_len:
 			_stride = 0.0
-			AudioManager.play(&"footstep", global_position, 0.0 if speed > 3.0 else -5.0)
-		if not _was_on_floor and _air_time > 0.35:
+			if audible:
+				AudioManager.play(&"footstep", global_position, 0.0 if speed > 3.0 else -5.0)
+		if audible and not _was_on_floor and _air_time > 0.35:
 			AudioManager.play(&"land", global_position)
 		_air_time = 0.0
 	else:
@@ -162,7 +192,7 @@ func _body_sounds(delta: float) -> void:
 
 ## Applies damage from `source` (a Soldier, or null for the world). Returns damage dealt.
 func take_damage(amount: float, source: Node = null, weapon_kind: StringName = &"") -> float:
-	if not alive:
+	if not alive or (protected_for > 0.0 and source != null):
 		return 0.0
 	var dealt := health.take_damage(amount, source)
 	if dealt > 0.0 and source:
@@ -206,6 +236,7 @@ func respawn_at(xform: Transform3D) -> void:
 	alive = true
 	collision_layer = LAYER_SOLDIERS
 	health.restore_full()
+	protected_for = SPAWN_PROTECTION
 	visual.reset()
 	visual.rotation.y = _body_yaw
 	_impulse = Vector3.ZERO

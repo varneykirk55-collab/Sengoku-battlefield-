@@ -17,7 +17,7 @@ placeholder for now.
 | M3 | Prototype battlefield, spawns, A/B/C, navmesh, ambience | **Done** |
 | M4 | AI armies 16v16 with squads, battle audio, Windows build | **Done** |
 | M5 | Conquest: tickets, HUD, match end | **Done** |
-| M6 | Profiling, fixes, Windows release | Next |
+| M6 | Profiling, fixes, Windows release | **Done** |
 
 ## Running
 
@@ -26,6 +26,9 @@ placeholder for now.
 **AI battle report / profiling:** `SIM_SECONDS=60 SIM_SOLDIERS=16 tools/sim.sh`
 
 **Tests (headless):** `tools/test.sh` (downloads Godot 4.7.2 to `~/.cache/sengoku` on first run).
+
+**Tuning:** match rules and army sizes in `data/battle/default_battle.tres`; weapon timings and damage in
+`data/weapons/*.tres`.
 
 **Windows build:** `tools/export_windows.sh <label>` writes `dist/SengokuBattlefield-<label>-Windows.zip`
 (a single `.exe` with the game data embedded). Packaged Windows builds are planned at M2, M4 and M6.
@@ -59,4 +62,12 @@ tools/         setup, test, export, screenshot, audio generator
 docs/          architecture, audio, testing notes
 ```
 
-More: [Architecture](docs/ARCHITECTURE.md) · [Audio](docs/AUDIO.md) · [Testing](docs/TESTING.md) · [Asset provenance](LICENSES.md)
+## Playing
+
+Main menu → **Enter the Battle**: 16 v 16 conquest on the prototype battlefield (A farmstead,
+B hilltop shrine, C river outpost). Capture points by standing in them; the side with fewer points
+bleeds tickets; every death costs a ticket; zero tickets loses. **Training Range**: weapons
+practice against idle targets.
+
+More: [Architecture](docs/ARCHITECTURE.md) · [Audio](docs/AUDIO.md) · [Testing & known limitations](docs/TESTING.md) ·
+[Performance](docs/PERFORMANCE.md) · [Asset integration](docs/INTEGRATION.md) · [Asset provenance](LICENSES.md)

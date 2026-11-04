@@ -66,6 +66,7 @@ func dummy(faction: int, pos: Vector3) -> Soldier:
 	var s := battle.spawn_soldier(faction, false, [&"katana"] as Array[StringName])
 	battle.director.register(s)
 	s.respawn_at(Transform3D(Basis.IDENTITY, pos))
+	s.protected_for = 0.0
 	return s
 
 

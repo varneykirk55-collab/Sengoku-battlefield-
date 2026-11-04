@@ -41,6 +41,7 @@ func _on_sound(id: StringName, _pos: Variant) -> void:
 func enemy(pos: Vector3, loadout: Array[StringName] = [&"katana"], faction: int = 1) -> Soldier:
 	var s := battle.spawn_soldier(faction, false, loadout)
 	s.respawn_at(Transform3D(Basis(Vector3.UP, PI), pos))
+	s.protected_for = 0.0  # tests strike immediately; spawn protection has its own test
 	return s
 
 
@@ -249,3 +250,20 @@ func test_near_miss_whiz() -> void:
 	check(heard.has(&"matchlock_fire"), "enemy gunshot heard")
 	check(heard.has(&"bullet_whiz"), "ball passing close to the player whizzes")
 	check_near(player.health.current, 100.0, 0.01, "near miss does no damage")
+
+
+func test_spawn_protection() -> void:
+	var e := battle.spawn_soldier(1, false, [&"katana"] as Array[StringName])
+	e.respawn_at(Transform3D(Basis(Vector3.UP, PI), Vector3(0, 0.1, -1.8)))
+	await physics_frames(5)
+	await tap("primary")
+	await seconds(0.5)
+	check_near(e.health.current, 100.0, 0.01, "freshly spawned soldier can't be hurt")
+	await seconds(2.0)
+	await tap("primary")
+	await seconds(0.5)
+	check(e.health.current < 100.0, "protection wears off after 2 s")
+	var e2 := battle.spawn_soldier(1, false, [&"katana"] as Array[StringName])
+	e2.respawn_at(Transform3D(Basis(Vector3.UP, PI), Vector3(3, 0.1, -3)))
+	e2.weapons.primary(true)
+	check_eq(e2.protected_for, 0.0, "attacking ends spawn protection")

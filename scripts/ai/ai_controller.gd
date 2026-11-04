@@ -57,6 +57,12 @@ func _ready() -> void:
 
 ## Decision step (called by the director at ~ai_think_hz).
 func think() -> void:
+	var t0 := Time.get_ticks_usec()
+	_think_body()
+	prof_think_us += Time.get_ticks_usec() - t0
+
+
+func _think_body() -> void:
 	var objective_pos := squad.objective.global_position if squad and squad.objective else soldier.global_position
 	var seek := RANGED_SEEK_RADIUS if _gun_ready() else MELEE_SEEK_RADIUS
 	var prev_target := target
@@ -93,7 +99,18 @@ func think() -> void:
 			agent.target_position = destination
 
 
+## Profiling accumulators (microseconds), read by tools/sim.
+static var prof_think_us := 0
+static var prof_steer_us := 0
+
+
 func _physics_process(delta: float) -> void:
+	var t0 := Time.get_ticks_usec()
+	_physics_body(delta)
+	prof_steer_us += Time.get_ticks_usec() - t0
+
+
+func _physics_body(delta: float) -> void:
 	if not soldier.alive:
 		soldier.move_dir = Vector3.ZERO
 		return

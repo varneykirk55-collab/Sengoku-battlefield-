@@ -81,6 +81,7 @@ func _selfcheck() -> void:
 	for s in battle.soldiers:
 		if s.faction != p.faction and (target == null or s.global_position.distance_to(p.global_position) < target.global_position.distance_to(p.global_position)):
 			target = s
+	target.protected_for = 0.0
 	# Katana: step up to the nearest enemy and cut.
 	p.respawn_at(Transform3D(Basis.IDENTITY, target.global_position + Vector3(0, 0.1, 1.8)))
 	for i in 5:

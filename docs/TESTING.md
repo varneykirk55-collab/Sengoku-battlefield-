@@ -118,3 +118,27 @@
 - Simulated default match (150 tickets at the time): faction 0 won after 248 s, 195 kills,
   7 captures. Starting tickets raised to 250 (~7 minutes); tune in `data/battle/default_battle.tres`.
 - Screenshots checked: ticket strip, A/B/C chips, contested capture bar, scoreboard.
+
+### M6 — 2026-11-04
+
+- 73/73 tests pass. New: spawn protection (2 s, ends when attacking).
+- Profiling and optimisation: see [PERFORMANCE.md](PERFORMANCE.md). 64 v 64 CPU cost
+  8.6 -> 7.3 ms per frame (physics LOD, fewer slides); 32 v 32 3.8 ms.
+- Packaged-build self-check passes (training range cut and shot; 16 v 16 AI battle).
+- Windows build: `SengokuBattlefield-M6-Windows.zip`. Not launched on Windows.
+
+## Known limitations (end of Phase 1)
+
+- **Not verified on Windows**: the `.exe` has never been launched; GPU frame rate unknown.
+- **Feel is untested by a person**: movement, melee timing, hit-stop, camera, AI difficulty and
+  audio balance were tuned from tests and screenshots only.
+- **Animation**: the Rōnin has no strafe, jump or block clips; strafing slides, jumps hold a
+  stride pose. The aim clip holds the gun ~30 degrees off, so the gun is turned to the line of
+  sight in code (hands don't follow exactly). Both armies use the same model (told apart by
+  banners and kimono tint).
+- **Combat**: no blocking/parrying (blades only clash by chance); matchlock is hitscan.
+- **AI**: no formations or volley fire; squads don't coordinate flanks; occasional crowding at
+  narrow gaps; marksmen don't seek cover while reloading.
+- **Audio**: all placeholders. Synthesized voices (battle cries, crowd, pain) are the weakest.
+- **Map**: one prototype map from primitives; no buildings to enter.
+- Godot reports a few audio playbacks "still in use at exit" when run headless (harmless).

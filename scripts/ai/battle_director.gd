@@ -223,6 +223,10 @@ func _update_lod(s: Soldier) -> void:
 	var d := AudioManager.listener_position().distance_to(s.global_position)
 	var interval := 0.0 if d < 25.0 else (1.0 / 30.0 if d < 60.0 else (1.0 / 15.0 if d < 120.0 else 1.0 / 8.0))
 	s.visual.update_interval = interval
+	# Physics LOD: out of sight-range and not fighting -> character controller at half rate.
+	var fighting := s.controller is AIController and (s.controller as AIController).target != null and \
+		(s.controller as AIController).target.global_position.distance_to(s.global_position) < 15.0
+	s.half_rate_physics = d > 70.0 and not fighting
 	var shadows := d < 70.0
 	if s.visual.get_meta("shadows", true) != shadows:
 		s.visual.set_meta("shadows", shadows)

@@ -27,6 +27,7 @@ var listener_override: Node3D = null
 var stats := {}
 
 var _clock := 0.0
+var _listener_cached := Vector3.ZERO
 var _pool_3d: Array[AudioStreamPlayer3D] = []
 var _pool_2d: Array[AudioStreamPlayer] = []
 ## player -> {event, priority, distance, end}
@@ -67,6 +68,11 @@ func _ready() -> void:
 
 func _process(delta: float) -> void:
 	_clock += delta
+	_listener_cached = _compute_listener()
+
+
+func _physics_process(_delta: float) -> void:
+	_listener_cached = _compute_listener()
 
 
 ## Makes sure the six game buses exist even if the bus layout resource is missing.
@@ -224,7 +230,14 @@ func active_voice_count() -> int:
 	return n
 
 
+## Where the player's ears are (the active camera). Cached once per frame.
 func listener_position() -> Vector3:
+	if is_instance_valid(listener_override):
+		return listener_override.global_position
+	return _listener_cached
+
+
+func _compute_listener() -> Vector3:
 	if is_instance_valid(listener_override):
 		return listener_override.global_position
 	var vp := get_viewport()

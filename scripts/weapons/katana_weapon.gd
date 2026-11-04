@@ -111,6 +111,7 @@ func _start(a: AttackData) -> void:
 		combo += 1
 	_combo_reset = 0.9
 	attack_yaw = _assisted_yaw()
+	soldier.protected_for = 0.0
 	soldier.facing_override = attack_yaw
 	soldier.speed_scale = a.move_scale
 	soldier.visual.play_action(a.animation, a.total_time())
