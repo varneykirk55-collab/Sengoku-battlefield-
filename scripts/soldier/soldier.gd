@@ -37,12 +37,15 @@ var look_yaw := 0.0
 var look_pitch := 0.0
 ## While true the body faces look_yaw (aiming / attacking); otherwise it faces its movement.
 var face_look := false
-## Multiplier applied by weapons (e.g. aiming slows to slow_speed / run_speed).
+## Multiplier applied by weapons (aiming, reloading, swinging).
 var speed_scale := 1.0
+## Yaw forced by an attack in progress (NAN = none).
+var facing_override := NAN
 
 var controller: Node = null
 var health: HealthComponent
 var visual: SoldierVisual
+var weapons: WeaponHolder
 var alive := true
 var is_player := false
 var kills := 0
@@ -53,6 +56,8 @@ var _stride := 0.0
 var _was_on_floor := true
 var _air_time := 0.0
 var _body_yaw := 0.0
+var _impulse := Vector3.ZERO
+var _move_vel := Vector3.ZERO
 
 
 func _ready() -> void:
@@ -69,6 +74,20 @@ func _ready() -> void:
 	visual.setup(faction)
 	_body_yaw = look_yaw
 	visual.rotation.y = _body_yaw
+	weapons = WeaponHolder.new()
+	weapons.name = "Weapons"
+	add_child(weapons)
+
+
+## Gives the soldier its weapons. The first one is drawn. e.g. [&"katana", &"matchlock"].
+func equip_loadout(loadout: Array[StringName]) -> void:
+	weapons.setup(self, loadout)
+
+
+## Short shove (lunges, knockback). Decays quickly.
+func push(v: Vector3) -> void:
+	v.y = 0.0
+	_impulse += v
 
 
 func _physics_process(delta: float) -> void:
@@ -95,9 +114,12 @@ func _move(delta: float) -> void:
 	var top := (sprint_speed if sprinting else run_speed) * speed_scale
 	var target := dir * top
 	var accel := acceleration if is_on_floor() else acceleration * air_control
-	var horizontal := Vector3(velocity.x, 0.0, velocity.z).move_toward(target, accel * delta)
-	velocity.x = horizontal.x
-	velocity.z = horizontal.z
+	# Controlled movement and short pushes (lunges, knockback) are kept apart so pushes decay
+	# on their own instead of feeding back into the acceleration.
+	_move_vel = _move_vel.move_toward(target, accel * delta)
+	velocity.x = _move_vel.x + _impulse.x
+	velocity.z = _move_vel.z + _impulse.z
+	_impulse = _impulse.move_toward(Vector3.ZERO, 22.0 * delta)
 	if is_on_floor():
 		if wants_jump:
 			velocity.y = jump_velocity
@@ -111,7 +133,9 @@ func _move(delta: float) -> void:
 func _turn(delta: float) -> void:
 	var target := _body_yaw
 	var flat := Vector2(velocity.x, velocity.z)
-	if face_look:
+	if not is_nan(facing_override):
+		target = facing_override
+	elif face_look:
 		target = look_yaw
 	elif flat.length() > 0.6:
 		target = atan2(-velocity.x, -velocity.z)
@@ -158,6 +182,10 @@ func die(killer: Node) -> void:
 		(killer as Soldier).kills += 1
 	collision_layer = 0  # corpses don't block the living or stop bullets
 	move_dir = Vector3.ZERO
+	weapons.on_death()
+	facing_override = NAN
+	speed_scale = 1.0
+	face_look = false
 	visual.die()
 	AudioManager.play(&"death_cry", head_position())
 	get_tree().create_timer(0.7, false).timeout.connect(func() -> void:
@@ -180,6 +208,9 @@ func respawn_at(xform: Transform3D) -> void:
 	health.restore_full()
 	visual.reset()
 	visual.rotation.y = _body_yaw
+	_impulse = Vector3.ZERO
+	_move_vel = Vector3.ZERO
+	weapons.on_respawn()
 	_was_on_floor = true
 	_air_time = 0.0
 	respawned.emit(self)

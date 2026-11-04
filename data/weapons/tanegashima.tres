@@ -1,0 +1,24 @@
+[gd_resource type="Resource" script_class="FirearmData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/combat/firearm_data.gd" id="1_gun"]
+
+[resource]
+script = ExtResource("1_gun")
+id = &"tanegashima"
+display_name = "Tanegashima"
+damage = 85.0
+headshot_multiplier = 2.5
+falloff_start = 50.0
+falloff_end = 150.0
+falloff_min = 0.5
+max_range = 250.0
+spread_aimed = 0.35
+spread_hip = 3.0
+spread_moving = 2.0
+spread_airborne = 4.0
+ignition_delay = 0.08
+reload_time = 9.0
+reserve_ammo = 12
+aim_move_scale = 0.5
+reload_move_scale = 0.55
+recoil_shake = 0.45

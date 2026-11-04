@@ -1,0 +1,22 @@
+[gd_resource type="Resource" script_class="AttackData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/combat/attack_data.gd" id="1_attack"]
+
+[resource]
+script = ExtResource("1_attack")
+id = &"heavy"
+startup = 0.42
+active = 0.16
+recovery = 0.5
+cancel_point = 0.2
+damage = 75.0
+knockback = 5.0
+reach = 2.7
+sweep_from = 95.0
+sweep_to = -95.0
+max_targets = 3
+lunge_speed = 7.0
+move_scale = 0.35
+swing_sound = &"katana_swing_heavy"
+hitstop = 0.08
+camera_shake = 0.35

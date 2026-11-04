@@ -46,3 +46,23 @@
   of the world kills; an upper-body slash plays while running; pause menu pauses and resumes.
 - Screenshots checked: third person, first person, facing, faction banners, running slash layering.
 - Not verified: how movement and cameras feel with a real mouse/gamepad.
+
+### M2 — 2026-11-04
+
+- 42/42 tests pass, three consecutive runs. New (combat): player spawns with katana drawn and matchlock
+  slung; light cut hits for 34 with swing / hit / hurt / hit-marker sounds; three light cuts kill
+  (kill credited, kill marker, death cry); heavy cut deals nothing during wind-up then 75; no
+  friendly fire and no hits behind; melee assist turns a cut onto an enemy ~29 degrees off;
+  switching moves the katana to the hip (scabbard shown, blade hidden) with raise / draw sounds;
+  switching is blocked mid-swing; aimed matchlock shot deals 85 at 20 m with gunshot and impact
+  sounds; reload starts automatically, takes ~9 s, plays all five reload steps, dry-clicks if you
+  fire early, and uses one ball from the reserve; headshots kill; damage falloff with distance;
+  reload progress pauses while the katana is out and resumes; no friendly fire from bullets;
+  blades clash; an enemy ball passing near the player whizzes.
+- The test script now also fails on any GDScript runtime error printed during the run.
+- Packaged-build self-check (Linux twin of the Windows build): all audio found; a scripted katana
+  cut and matchlock shot land inside the exported game, 16 sounds played. PASS.
+- Screenshots checked: katana in hand (scabbard hidden), sheathed at the hip, matchlock shouldered
+  along the line of sight, slung on the back, AI soldiers' procedural weapons.
+- Windows build: `SengokuBattlefield-M2-Windows.zip` exported. Not launched on Windows.
+- Not verified: combat feel, hit-stop and camera shake strength, audio balance.

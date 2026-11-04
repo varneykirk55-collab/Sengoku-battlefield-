@@ -7,7 +7,7 @@ config_version=5
 
 config/name="Sengoku Battlefield"
 config/description="Single-player, Battlefield-style Sengoku-era combat: one soldier among two AI armies."
-config/version="0.1.0-m0"
+config/version="0.2.0-m2"
 run/main_scene="res://scenes/main_menu.tscn"
 config/features=PackedStringArray("4.7", "Forward Plus")
 config/icon="res://icon.svg"
@@ -23,6 +23,7 @@ GameInput="*res://autoload/game_input.gd"
 Events="*res://autoload/events.gd"
 AudioManager="*res://autoload/audio_manager.gd"
 Music="*res://autoload/music_manager.gd"
+FX="*res://autoload/fx.gd"
 
 [display]
 

@@ -12,6 +12,10 @@ var death_panel: PanelContainer
 var death_label: Label
 var hint: Label
 var root: Control
+var weapon_name: Label
+var weapon_status: Label
+var weapon_bar: ProgressBar
+var marker: Control
 
 var _respawn_at := 0.0
 var _flash := 0.0
@@ -49,10 +53,34 @@ func _ready() -> void:
 	health_bar.value = 100
 	hp.add_child(health_bar)
 
-	hint = UIStyle.label("V camera · F2 test damage · Esc pause", 14, UIStyle.MUTED)
+	var wp := VBoxContainer.new()
+	wp.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT)
+	wp.offset_left = -360
+	wp.offset_top = -140
+	wp.alignment = BoxContainer.ALIGNMENT_END
+	root.add_child(wp)
+	weapon_name = UIStyle.label("", 26)
+	weapon_name.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	wp.add_child(weapon_name)
+	weapon_status = UIStyle.label("", 17, UIStyle.MUTED)
+	weapon_status.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	wp.add_child(weapon_status)
+	weapon_bar = ProgressBar.new()
+	weapon_bar.custom_minimum_size = Vector2(320, 8)
+	weapon_bar.show_percentage = false
+	weapon_bar.max_value = 1.0
+	wp.add_child(weapon_bar)
+
+	marker = HitMarker.new()
+	marker.set_anchors_preset(Control.PRESET_CENTER)
+	root.add_child(marker)
+	Events.damage_dealt.connect(_on_damage_dealt)
+	Events.soldier_killed.connect(_on_killed)
+
+	hint = UIStyle.label("LMB/RMB attack · Q switch · R reload · V camera · F2 hurt self · Esc", 14, UIStyle.MUTED)
 	hint.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT)
-	hint.offset_left = -420
-	hint.offset_top = -40
+	hint.offset_left = -700
+	hint.offset_top = -32
 	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	root.add_child(hint)
 
@@ -94,6 +122,34 @@ func _process(delta: float) -> void:
 	damage_flash.color.a = _flash * 0.6
 	if death_panel.visible:
 		_update_death_text()
+	_update_weapon()
+
+
+func _update_weapon() -> void:
+	if player == null or player.weapons == null or player.weapons.current() == null:
+		return
+	var w := player.weapons.current()
+	weapon_name.text = w.display_name
+	weapon_status.text = w.status_text() if not player.weapons.switching() else "..."
+	var p := w.progress()
+	weapon_bar.visible = p >= 0.0
+	if p >= 0.0:
+		weapon_bar.value = p
+	crosshair.modulate.a = 0.35 if w is KatanaWeapon else 1.0
+	(crosshair as Crosshair).spread = (w as MatchlockWeapon).spread() if w is MatchlockWeapon else 0.0
+	crosshair.queue_redraw()
+
+
+func _on_damage_dealt(attacker: Node, _victim: Node, _amount: float, _kind: StringName) -> void:
+	if attacker == player:
+		(marker as HitMarker).flash(false)
+		AudioManager.play(&"hit_marker")
+
+
+func _on_killed(victim: Node, killer: Node) -> void:
+	if killer == player and victim != player:
+		(marker as HitMarker).flash(true)
+		AudioManager.play(&"kill_marker")
 
 
 func _update_death_text() -> void:
@@ -110,7 +166,38 @@ func _on_health_changed(current: float, maximum: float) -> void:
 	health_bar.add_theme_stylebox_override("fill", UIStyle.bar_fill(UIStyle.VERMILION if low else Color(0.85, 0.8, 0.7)))
 
 
+class HitMarker extends Control:
+	var _t := 0.0
+	var _kill := false
+
+	func _ready() -> void:
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+		custom_minimum_size = Vector2(40, 40)
+		position -= Vector2(20, 20)
+
+	func flash(kill: bool) -> void:
+		_t = 0.35 if kill else 0.2
+		_kill = kill
+		queue_redraw()
+
+	func _process(delta: float) -> void:
+		if _t > 0.0:
+			_t -= delta
+			queue_redraw()
+
+	func _draw() -> void:
+		if _t <= 0.0:
+			return
+		var c := Vector2(20, 20)
+		var col := UIStyle.VERMILION if _kill else Color.WHITE
+		for d in [Vector2(1, 1), Vector2(-1, 1), Vector2(1, -1), Vector2(-1, -1)]:
+			draw_line(c + d * 7.0, c + d * 14.0, col, 3.0 if _kill else 2.0)
+
+
 class Crosshair extends Control:
+	## Matchlock spread in degrees (0 for the katana).
+	var spread := 0.0
+
 	func _ready() -> void:
 		mouse_filter = Control.MOUSE_FILTER_IGNORE
 		custom_minimum_size = Vector2(24, 24)
@@ -120,5 +207,6 @@ class Crosshair extends Control:
 		var c := Vector2(12, 12)
 		var col := Color(1, 1, 1, 0.85)
 		draw_circle(c, 2.0, col)
+		var gap := 6.0 + spread * 6.0
 		for d in [Vector2.UP, Vector2.DOWN, Vector2.LEFT, Vector2.RIGHT]:
-			draw_line(c + d * 6.0, c + d * 11.0, col, 2.0)
+			draw_line(c + d * gap, c + d * (gap + 5.0), col, 2.0)

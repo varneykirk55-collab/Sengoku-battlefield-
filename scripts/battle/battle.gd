@@ -9,6 +9,9 @@ const SOLDIER_SCENE := preload("res://scenes/soldier.tscn")
 
 @export var player_faction := 0
 @export var respawn_delay := 5.0
+## M2 test range: idle enemy soldiers to cut and shoot (replaced by the AI armies in M4).
+@export var training_targets := true
+const PLAYER_LOADOUT: Array[StringName] = [&"katana", &"matchlock"]
 
 var field: Node3D
 var player: Soldier
@@ -29,6 +32,8 @@ func _ready() -> void:
 	player = spawn_soldier(player_faction, true)
 	hud.bind_player(player)
 	player.died.connect(_on_player_died)
+	if training_targets:
+		_spawn_training_targets()
 	_start_audio()
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 	player_spawned.emit(player)
@@ -41,14 +46,16 @@ func _build_field() -> Node3D:
 	return ground
 
 
-func spawn_soldier(faction: int, as_player: bool = false) -> Soldier:
+func spawn_soldier(faction: int, as_player: bool = false, loadout: Array[StringName] = PLAYER_LOADOUT) -> Soldier:
 	var s: Soldier = SOLDIER_SCENE.instantiate()
 	s.faction = faction
+	s.is_player = as_player
 	s.name = ("Player" if as_player else "Soldier_%d_%d" % [faction, soldiers.size()])
 	var xform := spawn_transform(faction)
 	s.look_yaw = xform.basis.get_euler().y
 	add_child(s)
 	s.global_position = xform.origin
+	s.equip_loadout(loadout)
 	if as_player:
 		var pc := PlayerController.new()
 		pc.name = "PlayerController"
@@ -66,6 +73,26 @@ func spawn_transform(faction: int) -> Transform3D:
 	var p: Node3D = points[randi() % points.size()]
 	var offset := Vector3(randf_range(-3, 3), 0.5, randf_range(-3, 3))
 	return Transform3D(p.global_basis, p.global_position + offset)
+
+
+## Idle enemies (and one ally) at several ranges; they come back a few seconds after dying.
+func _spawn_training_targets() -> void:
+	var spots := [
+		[1, Vector3(0, 0, -12), [&"katana"]], [1, Vector3(3, 0, -14), [&"katana"]],
+		[1, Vector3(-8, 0, -30), [&"matchlock", &"katana"]], [1, Vector3(10, 0, -55), [&"matchlock", &"katana"]],
+		[0, Vector3(-4, 0, -6), [&"katana"]],
+	]
+	for spot in spots:
+		var loadout: Array[StringName] = []
+		loadout.assign(spot[2])
+		var s := spawn_soldier(spot[0], false, loadout)
+		s.display_name = "Training enemy" if spot[0] != player_faction else "Ally"
+		var home := Transform3D(Basis(Vector3.UP, 0.0 if spot[0] == player_faction else PI), spot[1] + Vector3(0, 0.3, 0))
+		s.respawn_at(home)
+		s.died.connect(func(dead: Soldier, _k: Node) -> void:
+			get_tree().create_timer(4.0, false).timeout.connect(func() -> void:
+				if is_instance_valid(dead):
+					dead.respawn_at(home)))
 
 
 func _on_player_died(_s: Soldier, killer: Node) -> void:

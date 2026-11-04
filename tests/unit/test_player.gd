@@ -8,11 +8,16 @@ var heard: Array[StringName] = []
 
 func before_each() -> void:
 	battle = load("res://scenes/battle.tscn").instantiate()
+	battle.training_targets = false
 	add_child(battle)
 	player = battle.player
 	heard.clear()
 	AudioManager.sound_played.connect(_on_sound)
-	await physics_frames(20)  # settle onto the ground
+	await physics_frames(10)
+	# A clear lane facing -Z, away from the test ground's crates.
+	player.respawn_at(Transform3D(Basis.IDENTITY, Vector3(-40, 0.1, 10)))
+	(player.controller as PlayerController)._yaw = 0.0
+	await physics_frames(10)  # settle onto the ground
 	heard.clear()
 
 

@@ -57,16 +57,52 @@ func _ready() -> void:
 	_focus_first_button()
 
 
-## Run an exported build with `-- --selfcheck` to confirm its audio was packaged and discovered.
+## Run an exported build with `-- --selfcheck` to confirm it was packaged correctly: all audio
+## is found, and a short scripted fight (katana cut, weapon switch, matchlock shot) works.
 func _selfcheck() -> void:
+	var ok := true
 	var with_audio := 0
 	for id: StringName in AudioManager.events:
 		if AudioManager.has_event(id):
 			with_audio += 1
+	ok = ok and with_audio == AudioManager.events.size() and Music.tracks.size() >= 4
 	print("[selfcheck] sound events with audio: %d/%d" % [with_audio, AudioManager.events.size()])
 	print("[selfcheck] music tracks: %s" % ", ".join(Music.tracks.keys().map(func(k): return String(k))))
-	print("[selfcheck] battle scene present: %s" % ResourceLoader.exists(BATTLE_SCENE))
-	AudioManager.quit_game(0 if with_audio == AudioManager.events.size() and Music.tracks.size() >= 4 else 1)
+	var battle: Battle = load(BATTLE_SCENE).instantiate()
+	get_tree().root.add_child.call_deferred(battle)
+	await get_tree().process_frame
+	for i in 30:
+		await get_tree().physics_frame
+	var p := battle.player
+	var target: Soldier = null
+	for s in battle.soldiers:
+		if s.faction != p.faction and (target == null or s.global_position.distance_to(p.global_position) < target.global_position.distance_to(p.global_position)):
+			target = s
+	# Katana: step up to the nearest enemy and cut.
+	p.respawn_at(Transform3D(Basis.IDENTITY, target.global_position + Vector3(0, 0.1, 1.8)))
+	for i in 5:
+		await get_tree().physics_frame
+	p.weapons.primary(true)
+	for i in 40:
+		await get_tree().physics_frame
+	var cut := target.health.current < 100.0
+	print("[selfcheck] katana cut landed: %s (enemy health %d)" % [cut, int(target.health.current)])
+	# Matchlock: switch, aim at the enemy's chest, fire.
+	p.weapons.select_kind(&"matchlock")
+	for i in 40:
+		await get_tree().physics_frame
+	var before := target.health.current
+	p.weapons.aim_provider = func() -> Array:
+		var eye := p.head_position() - Vector3(0, 0.1, 0)
+		return [eye, (target.chest_position() - eye).normalized()]
+	p.weapons.primary(true)
+	for i in 30:
+		await get_tree().physics_frame
+	var shot := target.health.current < before or not target.alive
+	print("[selfcheck] matchlock shot landed: %s; audio stats: %s" % [shot, AudioManager.stats])
+	ok = ok and cut and shot and AudioManager.stats.played > 10
+	print("[selfcheck] %s" % ("PASS" if ok else "FAIL"))
+	AudioManager.quit_game(0 if ok else 1)
 
 
 func _focus_first_button() -> void:

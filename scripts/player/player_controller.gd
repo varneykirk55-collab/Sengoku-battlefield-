@@ -40,6 +40,7 @@ func _ready() -> void:
 	soldier.visual.use_first_person_layers()
 	_yaw = soldier.look_yaw
 	_build_cameras()
+	soldier.weapons.aim_provider = crosshair_ray
 	soldier.died.connect(func(_s: Soldier, _k: Node) -> void: _apply_camera_mode())
 	soldier.respawned.connect(func(_s: Soldier) -> void:
 		_yaw = soldier.look_yaw
@@ -81,6 +82,21 @@ func _build_cameras() -> void:
 	fp_camera.far = 900.0
 	fp_camera.cull_mask = 0xFFFFF & ~(1 << (SoldierVisual.FIRST_PERSON_HIDDEN_LAYER - 1))
 	pitch_node.add_child(fp_camera)
+
+
+## Shots go where the crosshair points: find what the camera ray hits, then fire from the
+## soldier's eye toward that point (so third-person shots can't pass through cover the soldier
+## is behind).
+func crosshair_ray() -> Array:
+	var cam := current_camera()
+	var from := cam.global_position
+	var dir := -cam.global_basis.z
+	var q := PhysicsRayQueryParameters3D.create(from, from + dir * 400.0,
+		Soldier.LAYER_WORLD | Soldier.LAYER_SOLDIERS, [soldier.get_rid()])
+	var hit := soldier.get_world_3d().direct_space_state.intersect_ray(q)
+	var target: Vector3 = hit.position if not hit.is_empty() else from + dir * 400.0
+	var eye := soldier.head_position() - Vector3(0, 0.1, 0)
+	return [eye, (target - eye).normalized()]
 
 
 func toggle_camera() -> void:
@@ -147,6 +163,28 @@ func _physics_process(_delta: float) -> void:
 	soldier.wants_sprint = Input.is_action_pressed("sprint") and input.y > 0.3
 	if Input.is_action_just_pressed("jump"):
 		soldier.wants_jump = true
+	_weapon_input()
+
+
+func _weapon_input() -> void:
+	var w := soldier.weapons
+	if Input.is_action_just_pressed("primary"):
+		w.primary(true)
+	elif Input.is_action_just_released("primary"):
+		w.primary(false)
+	if Input.is_action_just_pressed("secondary"):
+		w.secondary(true)
+	elif Input.is_action_just_released("secondary"):
+		w.secondary(false)
+	if Input.is_action_just_pressed("reload"):
+		w.reload()
+	if Input.is_action_just_pressed("switch_weapon"):
+		w.switch_next()
+	if Input.is_action_just_pressed("weapon_katana"):
+		w.select_kind(&"katana")
+	if Input.is_action_just_pressed("weapon_matchlock"):
+		w.select_kind(&"matchlock")
+	aim_zoom = 1.0 if w.is_aiming() else 0.0
 
 
 func _update_rig(delta: float) -> void:

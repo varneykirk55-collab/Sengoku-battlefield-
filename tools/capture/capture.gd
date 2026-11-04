@@ -42,8 +42,26 @@ func _setup(inst: Node, step: String) -> void:
 			battle.player.visual.play_action(&"slash", 1.2)
 		"dummies":  # a line of soldiers from both factions to look at
 			for i in 6:
-				var s: Soldier = battle.spawn_soldier(i % 2)
-				s.global_position = battle.player.global_position + Vector3(-5 + i * 2.0, 0.2, -6)
-				s.look_yaw = PI
+				var lo: Array[StringName] = [&"katana"] if i < 3 else [&"matchlock", &"katana"]
+				var s: Soldier = battle.spawn_soldier(i % 2, false, lo)
+				s.respawn_at(Transform3D(Basis(Vector3.UP, PI), battle.player.global_position + Vector3(-5 + i * 2.0, 0.2, -6)))
+		"gun":
+			battle.player.weapons.select_kind(&"matchlock")
+		"fire":
+			battle.player.weapons.primary(true)
+		"close":  # camera close to the player's side
+			var pc := battle.player.controller as PlayerController
+			pc.spring.spring_length = 1.6
+		"side":
+			var pc := battle.player.controller as PlayerController
+			pc._yaw += PI * 0.5
+		"debuggun":
+			await get_tree().create_timer(0.5).timeout
+			var p := battle.player
+			var gun := p.weapons.get_weapon(&"matchlock") as MatchlockWeapon
+			var mz := gun.muzzle_position()
+			print("[capture] body_fwd=", p.body_forward(), " look=", p.look_direction(), " aim_dir=", p.visual.gun_aim_dir,
+				" mount_y=", p.visual.gun_mount.global_basis.y, " muzzle-mount=", (mz - p.visual.gun_mount.global_position).normalized(),
+				" model parent=", gun.model.get_parent().name, " model local=", gun.model.transform)
 		"wait":
 			await get_tree().create_timer(0.5).timeout

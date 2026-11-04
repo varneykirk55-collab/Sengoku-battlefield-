@@ -34,6 +34,15 @@ var hand_l: BoneAttachment3D
 var hip: BoneAttachment3D
 var back: BoneAttachment3D
 var head: BoneAttachment3D
+## Matchlock mount, placed every frame at the `musket_ctrl` bone (the clips move that bone to the
+## shoulder for aim/fire/reload and onto the back otherwise). Positioned by code rather than a
+## BoneAttachment3D so its orientation can be overridden reliably (see gun_aim_dir).
+var gun_mount: Node3D
+var _gun_bone := -1
+var stance: StringName = &"none"
+## When set (non-zero), the shouldered matchlock points along this world direction instead of
+## the clip's bone angle (the Rōnin aim clip holds the gun ~30 degrees off the line of sight).
+var gun_aim_dir := Vector3.ZERO
 var dead := false
 ## Seconds between animation updates (0 = every frame). Raised for distant soldiers.
 var update_interval := 0.0
@@ -57,6 +66,11 @@ func setup(faction: int) -> void:
 	hip = _attach("katana_sheath")
 	back = _attach("musket_back")
 	head = _attach("head")
+	gun_mount = Node3D.new()
+	gun_mount.name = "GunMount"
+	gun_mount.top_level = true
+	add_child(gun_mount)
+	_gun_bone = skeleton.find_bone("musket_ctrl")
 	_apply_faction(faction)
 
 
@@ -74,10 +88,19 @@ func set_locomotion(speed: float, grounded: bool) -> void:
 	tree.set("parameters/loco_speed/scale", scale)
 
 
-## Upper-body aim pose (matchlock raised), 0..1.
+## Upper-body stance held while moving: &"katana" (blade ready), &"matchlock" (gun shouldered)
+## or &"none" (arms follow the locomotion clip).
+func set_stance(kind: StringName) -> void:
+	stance = kind
+	if tree == null:
+		return
+	tree.set("parameters/aim_blend/blend_amount", 0.0 if kind == &"none" else 1.0)
+	tree.set("parameters/stance_mix/blend_amount", 1.0 if kind == &"matchlock" else 0.0)
+
+
+## Shoulders the matchlock (kept for tools/tests).
 func set_aim(amount: float) -> void:
-	if tree:
-		tree.set("parameters/aim_blend/blend_amount", clampf(amount, 0.0, 1.0))
+	set_stance(&"matchlock" if amount > 0.5 else &"none")
 
 
 ## Plays an upper-body action clip stretched to `duration` seconds.
@@ -121,7 +144,7 @@ func reset() -> void:
 	_action_end = 0.0
 	anim.stop()
 	tree.active = true
-	set_aim(0.0)
+	set_stance(stance)
 	set_locomotion(0.0, true)
 	tree.advance(0.0)
 
@@ -144,12 +167,27 @@ func _process(delta: float) -> void:
 	_time += delta
 	_accum += delta
 	if _accum < update_interval:
+		_place_gun()
 		return
 	if dead:
 		anim.advance(_accum)
 	elif tree:
 		tree.advance(_accum)
 	_accum = 0.0
+	_place_gun()
+
+
+func _place_gun() -> void:
+	if gun_mount.get_child_count() == 0:
+		return
+	var bone := skeleton.global_transform * skeleton.get_bone_global_pose(_gun_bone)
+	var basis := bone.basis.orthonormalized()
+	if gun_aim_dir != Vector3.ZERO:
+		var y := gun_aim_dir.normalized()
+		var z := (Vector3.UP - y * Vector3.UP.dot(y))
+		z = z.normalized() if z.length() > 0.1 else Vector3.BACK
+		basis = Basis(y.cross(z).normalized(), y, z)
+	gun_mount.global_transform = Transform3D(basis, bone.origin)
 
 
 # ----------------------------------------------------------------------------- setup helpers
@@ -190,12 +228,18 @@ func _build_tree() -> void:
 	for p in [[&"idle", 0.0], [&"walk", 1.0], [&"run", 2.0]]:
 		var a := AnimationNodeAnimation.new()
 		a.animation = CLIP[p[0]]
-		loco.add_blend_point(a, p[1])
+		loco.add_blend_point(a, p[1], -1, p[0])
 	bt.add_node(&"loco", loco, Vector2(0, 0))
 	bt.add_node(&"loco_speed", AnimationNodeTimeScale.new(), Vector2(200, 0))
 	var aim := AnimationNodeAnimation.new()
 	aim.animation = CLIP[&"aim"]
 	bt.add_node(&"aim", aim, Vector2(200, 200))
+	# Katana ready stance: the first frame of the slash, frozen (time scale 0).
+	var ready := AnimationNodeAnimation.new()
+	ready.animation = CLIP[&"slash"]
+	bt.add_node(&"ready", ready, Vector2(0, 300))
+	bt.add_node(&"ready_freeze", AnimationNodeTimeScale.new(), Vector2(200, 300))
+	bt.add_node(&"stance_mix", AnimationNodeBlend2.new(), Vector2(300, 250))
 	var aim_blend := AnimationNodeBlend2.new()
 	_filter_upper(aim_blend)
 	bt.add_node(&"aim_blend", aim_blend, Vector2(400, 0))
@@ -210,7 +254,10 @@ func _build_tree() -> void:
 	bt.add_node(&"oneshot", oneshot, Vector2(600, 0))
 	bt.connect_node(&"loco_speed", 0, &"loco")
 	bt.connect_node(&"aim_blend", 0, &"loco_speed")
-	bt.connect_node(&"aim_blend", 1, &"aim")
+	bt.connect_node(&"ready_freeze", 0, &"ready")
+	bt.connect_node(&"stance_mix", 0, &"ready_freeze")
+	bt.connect_node(&"stance_mix", 1, &"aim")
+	bt.connect_node(&"aim_blend", 1, &"stance_mix")
 	bt.connect_node(&"action_speed", 0, &"action")
 	bt.connect_node(&"oneshot", 0, &"aim_blend")
 	bt.connect_node(&"oneshot", 1, &"action_speed")
@@ -227,6 +274,8 @@ func _build_tree() -> void:
 	tree.set("parameters/loco_speed/scale", 1.0)
 	tree.set("parameters/action_speed/scale", 1.0)
 	tree.set("parameters/aim_blend/blend_amount", 0.0)
+	tree.set("parameters/ready_freeze/scale", 0.0)
+	tree.set("parameters/stance_mix/blend_amount", 0.0)
 
 
 func _filter_upper(node: AnimationNode) -> void:

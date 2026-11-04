@@ -28,3 +28,16 @@ Approved plan (Godot 4.7.2, GDScript). This file grows as milestones land.
 - Renderer: Forward+ for the Windows game; screenshots in the cloud use the OpenGL fallback.
 
 Original Kengeki and ASHIGARU repositories are reference-only; reused code is copied in and adapted.
+
+## Combat (M2)
+
+- `WeaponHolder` (on every Soldier) routes controller input (primary / secondary / reload / switch)
+  to `KatanaWeapon` or `MatchlockWeapon`. Shots use `holder.aim_ray()`, supplied by the controller
+  (player: crosshair ray; AI: eye toward target).
+- `Combat` resolves katana contacts (arc sweep from Kengeki, 30% clash chance when both swing) and
+  matchlock hitscan (falloff, headshots, no friendly fire, near-miss whiz).
+- Tuning lives in `data/weapons/*.tres` (AttackData, FirearmData).
+- Weapon models: player's katana is Katana.glb; AI weapons are procedural one-draw-call meshes.
+  The matchlock rides the rig's `musket_ctrl` bone and is turned onto the line of sight when
+  shouldered (the Rōnin aim clip holds it ~30 degrees off).
+- `FX` autoload: pooled tracers, muzzle flash + smoke, blood, dust, sparks, hit-stop.
