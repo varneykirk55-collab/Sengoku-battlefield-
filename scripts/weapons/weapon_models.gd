@@ -8,11 +8,20 @@ extends RefCounted
 ##                      aim / fire / reload and onto the back otherwise, so the gun is shouldered
 ##                      or slung automatically.
 ## AI soldiers use procedural low-poly models merged into one mesh (one draw call each);
-## the player's katana is the detailed Katana.glb from ASHIGARU.
+## the player's katana is the detailed Katana.glb from ASHIGARU, and the player's matchlock is the
+## recovered Flintlock.glb (a flintlock visual stand-in for the matchlock gameplay weapon; no
+## match glow since it has no serpentine/cord).
 
 const DETAILED_KATANA := preload("res://assets/weapons/Katana.glb")
 const KATANA_IN_HAND := Transform3D(Basis.IDENTITY, Vector3(0, 0.05, 0))
 const KATANA_SHEATHED := Transform3D(Basis.IDENTITY, Vector3(0, 0.02, 0))
+const DETAILED_MATCHLOCK := preload("res://assets/weapons/Flintlock.glb")
+## Flintlock.glb: root at butt, +X muzzle, +Y top of gun, lock on +Z. Map X->+Y (barrel),
+## Y->+Z (top, like the procedural sight), Z->+X (lock on the right, like the procedural lock),
+## then shift so the barrel axis runs through the bone and the lock sits at y~0.16.
+const DETAILED_MATCHLOCK_XFORM := Transform3D(
+		Basis(Vector3(0, 1, 0), Vector3(0, 0, 1), Vector3(1, 0, 0)), Vector3(0, -0.24, -0.10))
+const DETAILED_MUZZLE := Vector3(0, 1.20, 0)
 const MATCHLOCK_MOUNT := Transform3D(Basis.IDENTITY, Vector3(0, 0, 0))
 
 static var _katana_mesh: ArrayMesh
@@ -48,7 +57,7 @@ static func _show_scabbard(model: Node3D, on: bool) -> void:
 
 static func mount_matchlock(w: Weapon) -> void:
 	if w.model == null:
-		w.model = make_matchlock()
+		w.model = make_matchlock(w.soldier.is_player)
 	_reparent(w.model, w.soldier.visual.gun_mount, MATCHLOCK_MOUNT)
 
 
@@ -99,9 +108,18 @@ static func make_katana(detailed: bool) -> Node3D:
 	return root
 
 
-static func make_matchlock() -> Node3D:
+static func make_matchlock(detailed: bool = false) -> Node3D:
 	var root := Node3D.new()
 	root.name = "MatchlockModel"
+	if detailed:
+		var g: Node3D = DETAILED_MATCHLOCK.instantiate()
+		g.transform = DETAILED_MATCHLOCK_XFORM
+		root.add_child(g)
+		var m := Marker3D.new()
+		m.name = "Muzzle"
+		m.position = DETAILED_MUZZLE
+		root.add_child(m)
+		return root
 	var mi := MeshInstance3D.new()
 	mi.mesh = _matchlock()
 	mi.material_override = _mat()

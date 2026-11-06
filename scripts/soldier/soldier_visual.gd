@@ -70,6 +70,12 @@ var _last_scale := -1.0
 var _action_end := 0.0
 var _time := 0.0
 var _model_base_y := 0.0
+## Soft stance blends (Kirk-approved ~0.15 s crossfade).
+const STANCE_XFADE := 0.15
+var _aim_amount := 0.0
+var _stance_amount := 0.0
+var _aim_target := 0.0
+var _stance_target := 0.0
 
 
 func setup(faction: int) -> void:
@@ -122,10 +128,11 @@ func set_locomotion(speed: float, grounded: bool) -> void:
 ## or &"none" (arms follow the locomotion clip).
 func set_stance(kind: StringName) -> void:
 	stance = kind
+	_aim_target = 0.0 if kind == &"none" else 1.0
+	_stance_target = 1.0 if kind == &"matchlock" else 0.0
 	if tree == null:
 		return
-	tree.set(P_AIM, 0.0 if kind == &"none" else 1.0)
-	tree.set(P_STANCE, 1.0 if kind == &"matchlock" else 0.0)
+	# Amounts ease toward targets in _process_body (STANCE_XFADE).
 
 
 ## Shoulders the matchlock (kept for tools/tests).
@@ -180,6 +187,11 @@ func reset() -> void:
 	anim.stop()
 	tree.active = true
 	set_stance(stance)
+	_aim_amount = _aim_target
+	_stance_amount = _stance_target
+	if tree:
+		tree.set(P_AIM, _aim_amount)
+		tree.set(P_STANCE, _stance_amount)
 	_last_gait = -1.0
 	_last_scale = -1.0
 	set_locomotion(0.0, true)
@@ -212,6 +224,12 @@ func _process(delta: float) -> void:
 
 func _process_body(delta: float) -> void:
 	_time += delta
+	if tree and not dead and STANCE_XFADE > 0.0:
+		var k := clampf(delta / STANCE_XFADE, 0.0, 1.0)
+		_aim_amount = lerpf(_aim_amount, _aim_target, k)
+		_stance_amount = lerpf(_stance_amount, _stance_target, k)
+		tree.set(P_AIM, _aim_amount)
+		tree.set(P_STANCE, _stance_amount)
 	_accum += delta
 	if _accum < update_interval:
 		_place_gun()
@@ -272,6 +290,7 @@ func _build_tree() -> void:
 	var loco := AnimationNodeBlendSpace1D.new()
 	loco.min_space = 0.0
 	loco.max_space = 2.0
+	loco.sync = true  # keep Walk/Run in phase while blending (Kirk-approved)
 	for p in [[&"idle", 0.0], [&"walk", 1.0], [&"run", 2.0]]:
 		var a := AnimationNodeAnimation.new()
 		a.animation = CLIP[p[0]]
