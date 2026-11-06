@@ -4,12 +4,14 @@ extends Node
 
 signal changed(key: String)
 
-const AUDIO_BUSES: Array[StringName] = [&"Master", &"Music", &"Ambience", &"SFX", &"UI", &"Voice"]
+const AUDIO_BUSES: Array[StringName] = [&"Master", &"Music", &"Ambience", &"SFX", &"Weapons", &"Impacts", &"UI", &"Voice"]
 const DEFAULTS := {
 	"audio/Master": 0.9,
 	"audio/Music": 0.55,
 	"audio/Ambience": 0.8,
 	"audio/SFX": 0.9,
+	"audio/Weapons": 1.0,
+	"audio/Impacts": 1.0,
 	"audio/UI": 0.8,
 	"audio/Voice": 0.85,
 	"controls/mouse_sensitivity": 1.0,

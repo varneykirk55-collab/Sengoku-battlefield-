@@ -9,11 +9,13 @@ const BUS_LABELS := {
 	&"Music": "Music",
 	&"Ambience": "Ambience",
 	&"SFX": "Effects",
+	&"Weapons": "Weapons",
+	&"Impacts": "Impacts",
 	&"UI": "Interface",
 	&"Voice": "Voices",
 }
 ## A sound played when a slider is released, so the player hears the new level.
-const PREVIEW := {&"Music": &"", &"Ambience": &"amb_gust", &"SFX": &"katana_hit", &"UI": &"ui_confirm", &"Voice": &"battle_cry", &"Master": &"ui_confirm"}
+const PREVIEW := {&"Music": &"", &"Ambience": &"amb_gust", &"SFX": &"footstep", &"Weapons": &"katana_hit", &"Impacts": &"bullet_hit_ground", &"UI": &"ui_confirm", &"Voice": &"battle_cry", &"Master": &"ui_confirm"}
 
 var sliders: Dictionary = {}  # bus -> HSlider
 

@@ -7,12 +7,16 @@ extends RefCounted
 ##   matchlock       -> `musket_ctrl` bone: the samurai clips move this bone to the shoulder for
 ##                      aim / fire / reload and onto the back otherwise, so the gun is shouldered
 ##                      or slung automatically.
-## AI soldiers use procedural low-poly models merged into one mesh (one draw call each);
-## the player's katana is the detailed Katana.glb from ASHIGARU.
+## Player katana: detailed Katana.glb. AI katana: mid-detail procedural (one draw call) for mass
+## battles — flip USE_DETAILED_AI_KATANA if profiling allows instanced GLBs.
+## Matchlock: TEMP improved procedural tanegashima (no licensed GLB in-repo). Replace make_matchlock()
+## when a real asset arrives. Do NOT import Iron Crowns Napoleonic muskets without Kirk approval.
 
 const DETAILED_KATANA := preload("res://assets/weapons/Katana.glb")
-const KATANA_IN_HAND := Transform3D(Basis.IDENTITY, Vector3(0, 0.05, 0))
-const KATANA_SHEATHED := Transform3D(Basis.IDENTITY, Vector3(0, 0.02, 0))
+const USE_DETAILED_AI_KATANA := false
+## After Bot 1 socket repair (9845cd1): IDENTITY mounts; optional grip polish −0.02 m Y.
+const KATANA_IN_HAND := Transform3D(Basis.IDENTITY, Vector3(0, -0.02, 0))
+const KATANA_SHEATHED := Transform3D(Basis.IDENTITY, Vector3(0, 0.02, 0))  # saya along left waist; nudge +X only if armor clips
 const MATCHLOCK_MOUNT := Transform3D(Basis.IDENTITY, Vector3(0, 0, 0))
 
 static var _katana_mesh: ArrayMesh
@@ -54,7 +58,7 @@ static func mount_matchlock(w: Weapon) -> void:
 
 static func _ensure_katana(w: Weapon) -> void:
 	if w.model == null:
-		w.model = make_katana(w.soldier.is_player)
+		w.model = make_katana(w.soldier.is_player or USE_DETAILED_AI_KATANA)
 
 
 static func _reparent(n: Node3D, parent: Node3D, xform: Transform3D) -> void:
@@ -99,43 +103,48 @@ static func make_katana(detailed: bool) -> Node3D:
 	return root
 
 
+## TEMP procedural tanegashima — readable stock/barrel/lock/serpentine until a real GLB ships.
 static func make_matchlock() -> Node3D:
 	var root := Node3D.new()
-	root.name = "MatchlockModel"
+	root.name = "MatchlockModel_TEMP"
 	var mi := MeshInstance3D.new()
 	mi.mesh = _matchlock()
 	mi.material_override = _mat()
 	root.add_child(mi)
-	# The smouldering match cord in the serpentine.
+	# Smouldering match cord tip in the serpentine jaw.
 	var glow := MeshInstance3D.new()
 	var s := SphereMesh.new()
-	s.radius = 0.008
-	s.height = 0.016
+	s.radius = 0.007
+	s.height = 0.014
 	s.radial_segments = 6
 	s.rings = 3
 	glow.mesh = s
 	glow.material_override = _glow()
-	glow.position = Vector3(0.03, 0.2, 0.035)
+	glow.position = Vector3(0.032, 0.22, 0.04)
 	glow.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	root.add_child(glow)
 	var muzzle := Marker3D.new()
 	muzzle.name = "Muzzle"
-	muzzle.position = Vector3(0, 1.14, 0)
+	muzzle.position = Vector3(0, 1.16, 0)  # barrel tip along +Y
 	root.add_child(muzzle)
 	return root
 
 
 # ----------------------------------------------------------------------------- procedural meshes
 static func _katana() -> ArrayMesh:
+	# Mid-detail AI blade (one draw call). Player uses Katana.glb instead.
 	if _katana_mesh == null:
-		var steel := Color(0.78, 0.8, 0.84)
-		var wrap := Color(0.12, 0.1, 0.1)
-		var brass := Color(0.55, 0.42, 0.2)
+		var steel := Color(0.82, 0.84, 0.88)
+		var wrap := Color(0.1, 0.08, 0.08)
+		var brass := Color(0.58, 0.44, 0.22)
+		var iron := Color(0.25, 0.24, 0.24)
 		_katana_mesh = _combine([
-			[_box(Vector3(0.028, 0.70, 0.007)), Transform3D(Basis.IDENTITY, Vector3(0, 0.38, 0)), steel],
-			[_box(Vector3(0.016, 0.05, 0.006)), Transform3D(Basis(Vector3.BACK, 0.5), Vector3(0.004, 0.745, 0)), steel],
-			[_cyl(0.042, 0.008, 10), Transform3D(Basis.IDENTITY, Vector3(0, 0.02, 0)), brass],
-			[_box(Vector3(0.03, 0.27, 0.024)), Transform3D(Basis.IDENTITY, Vector3(0, -0.12, 0)), wrap],
+			[_box(Vector3(0.026, 0.72, 0.006)), Transform3D(Basis.IDENTITY, Vector3(0, 0.39, 0)), steel],
+			[_box(Vector3(0.014, 0.055, 0.005)), Transform3D(Basis(Vector3.BACK, 0.45), Vector3(0.004, 0.76, 0)), steel],
+			[_cyl(0.04, 0.007, 10), Transform3D(Basis.IDENTITY, Vector3(0, 0.02, 0)), iron],  # tsuba
+			[_cyl(0.018, 0.02, 8), Transform3D(Basis.IDENTITY, Vector3(0, 0.035, 0)), brass],  # fuchi
+			[_box(Vector3(0.028, 0.26, 0.022)), Transform3D(Basis.IDENTITY, Vector3(0, -0.12, 0)), wrap],
+			[_cyl(0.016, 0.022, 8), Transform3D(Basis.IDENTITY, Vector3(0, -0.26, 0)), iron],  # kashira
 		])
 	return _katana_mesh
 
@@ -150,23 +159,34 @@ static func _saya() -> ArrayMesh:
 
 
 static func _matchlock() -> ArrayMesh:
+	# TEMP improved low-poly tanegashima silhouette (octagonal barrel, full stock, lock, serpentine).
 	if _matchlock_mesh == null:
-		var iron := Color(0.16, 0.15, 0.15)
-		var wood := Color(0.36, 0.2, 0.1)
-		var brass := Color(0.62, 0.48, 0.22)
+		var iron := Color(0.18, 0.17, 0.16)
+		var wood := Color(0.42, 0.24, 0.12)
+		var dark_wood := Color(0.28, 0.15, 0.08)
+		var brass := Color(0.68, 0.52, 0.24)
 		_matchlock_mesh = _combine([
-			# octagonal barrel along +Y
-			[_cyl(0.017, 1.0, 8), Transform3D(Basis.IDENTITY, Vector3(0, 0.62, 0)), iron],
-			[_cyl(0.021, 0.04, 8), Transform3D(Basis.IDENTITY, Vector3(0, 1.1, 0)), iron],
-			# full-length wooden stock under the barrel
-			[_box(Vector3(0.04, 0.9, 0.035)), Transform3D(Basis.IDENTITY, Vector3(0, 0.5, -0.03)), wood],
-			# short cheek stock / grip (no shoulder stock on a tanegashima)
-			[_box(Vector3(0.045, 0.30, 0.07)), Transform3D(Basis(Vector3.RIGHT, -0.25), Vector3(0, -0.08, -0.06)), wood],
-			# brass lock plate and serpentine on the right side
-			[_box(Vector3(0.006, 0.1, 0.03)), Transform3D(Basis.IDENTITY, Vector3(0.024, 0.16, -0.015)), brass],
-			[_box(Vector3(0.006, 0.012, 0.05)), Transform3D(Basis(Vector3.RIGHT, 0.6), Vector3(0.03, 0.19, 0.015)), brass],
-			# front sight
-			[_box(Vector3(0.006, 0.015, 0.012)), Transform3D(Basis.IDENTITY, Vector3(0, 1.08, 0.02)), brass],
+			# octagonal barrel along +Y (muzzle at ~1.16)
+			[_cyl(0.015, 0.95, 8), Transform3D(Basis.IDENTITY, Vector3(0, 0.66, 0)), iron],
+			[_cyl(0.019, 0.05, 8), Transform3D(Basis.IDENTITY, Vector3(0, 1.12, 0)), iron],  # muzzle ring
+			[_cyl(0.022, 0.06, 8), Transform3D(Basis.IDENTITY, Vector3(0, 0.22, 0)), iron],  # breech
+			# forestock under barrel
+			[_box(Vector3(0.038, 0.85, 0.032)), Transform3D(Basis.IDENTITY, Vector3(0, 0.55, -0.028)), wood],
+			# cheek / pistol grip (tanegashima has no long shoulder stock)
+			[_box(Vector3(0.042, 0.22, 0.065)), Transform3D(Basis(Vector3.RIGHT, -0.35), Vector3(0, -0.02, -0.05)), dark_wood],
+			[_box(Vector3(0.04, 0.12, 0.055)), Transform3D(Basis(Vector3.RIGHT, -0.7), Vector3(0, -0.12, -0.09)), dark_wood],
+			# brass lock plate (right side)
+			[_box(Vector3(0.007, 0.12, 0.036)), Transform3D(Basis.IDENTITY, Vector3(0.026, 0.18, -0.01)), brass],
+			# serpentine (S-shaped match holder) — two angled boxes
+			[_box(Vector3(0.006, 0.014, 0.055)), Transform3D(Basis(Vector3.RIGHT, 0.75), Vector3(0.032, 0.21, 0.02)), brass],
+			[_box(Vector3(0.006, 0.01, 0.035)), Transform3D(Basis(Vector3.RIGHT, -0.4), Vector3(0.032, 0.24, 0.045)), brass],
+			# pan / flash pan shelf
+			[_box(Vector3(0.02, 0.018, 0.02)), Transform3D(Basis.IDENTITY, Vector3(0.02, 0.2, 0.012)), brass],
+			# front sight blade
+			[_box(Vector3(0.005, 0.014, 0.01)), Transform3D(Basis.IDENTITY, Vector3(0, 1.1, 0.018)), brass],
+			# barrel bands
+			[_cyl(0.02, 0.012, 8), Transform3D(Basis.IDENTITY, Vector3(0, 0.85, 0)), brass],
+			[_cyl(0.02, 0.012, 8), Transform3D(Basis.IDENTITY, Vector3(0, 0.45, 0)), brass],
 		])
 	return _matchlock_mesh
 

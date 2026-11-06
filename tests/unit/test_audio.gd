@@ -19,10 +19,15 @@ func after_each() -> void:
 
 
 func test_required_buses_exist_and_route_to_master() -> void:
-	for bus in [&"Master", &"Music", &"Ambience", &"SFX", &"UI", &"Voice"]:
+	for bus in [&"Master", &"Music", &"Ambience", &"SFX", &"Weapons", &"Impacts", &"UI", &"Voice"]:
 		var idx := AudioServer.get_bus_index(bus)
-		if check(idx >= 0, "bus %s exists" % bus) and bus != &"Master":
-			check_eq(AudioServer.get_bus_send(idx), &"Master", "bus %s sends to Master" % bus)
+		check(idx >= 0, "bus %s exists" % bus)
+	for bus in [&"Music", &"Ambience", &"SFX", &"UI", &"Voice"]:
+		var idx := AudioServer.get_bus_index(bus)
+		check_eq(AudioServer.get_bus_send(idx), &"Master", "bus %s sends to Master" % bus)
+	for bus in [&"Weapons", &"Impacts"]:
+		var idx := AudioServer.get_bus_index(bus)
+		check_eq(AudioServer.get_bus_send(idx), &"SFX", "bus %s sends to SFX" % bus)
 
 
 func test_every_catalog_event_has_audio() -> void:
@@ -50,7 +55,7 @@ func test_positional_sound_plays_on_3d_voice() -> void:
 	check(p is AudioStreamPlayer3D, "positional event uses a 3D player")
 	if p:
 		check_near((p as AudioStreamPlayer3D).global_position.x, 3.0, 0.01, "player placed at the sound position")
-		check_eq((p as AudioStreamPlayer3D).bus, &"SFX", "katana_hit routed to SFX")
+		check_eq((p as AudioStreamPlayer3D).bus, &"Weapons", "katana_hit routed to Weapons")
 	var ui := AudioManager.play(&"ui_click")
 	check(ui is AudioStreamPlayer, "UI event uses a 2D player")
 	check_eq(AudioManager.stats.played, 2, "both sounds counted as played")
