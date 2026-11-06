@@ -16,7 +16,7 @@ extends Node
 ## Emitted for every sound that actually starts (tests and debugging listen to this).
 signal sound_played(id: StringName, position: Variant)
 
-const BUSES: Array[StringName] = [&"Master", &"Music", &"Ambience", &"SFX", &"UI", &"Voice"]
+const BUSES: Array[StringName] = [&"Master", &"Music", &"Ambience", &"SFX", &"Weapons", &"Impacts", &"UI", &"Voice"]
 const POOL_3D := 40
 const POOL_2D := 16
 
@@ -75,7 +75,7 @@ func _physics_process(_delta: float) -> void:
 	_listener_cached = _compute_listener()
 
 
-## Makes sure the six game buses exist even if the bus layout resource is missing.
+## Makes sure the game buses exist even if the bus layout resource is missing.
 func ensure_buses() -> void:
 	for bus in BUSES:
 		if AudioServer.get_bus_index(bus) == -1:

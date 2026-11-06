@@ -86,11 +86,16 @@ static func hitscan(shooter: Soldier, origin: Vector3, direction: Vector3, data:
 			if s.alive:
 				s.push(direction * 1.5)
 		AudioManager.play(&"bullet_hit_flesh", r.position)
-		FX.blood(r.position, direction)
+		# Armored samurai: sparks on torso hits, blood elsewhere / on kill path.
+		var hit_y: float = r.position.y - s.global_position.y
+		if hit_y > 0.7 and hit_y < 1.45 and s.alive:
+			FX.impact(r.position, r.normal, &"armor")
+		else:
+			FX.impact(r.position, direction, &"flesh")
 	else:
 		var wood := r.collider is Node and (r.collider as Node).is_in_group("wood")
 		AudioManager.play(&"bullet_hit_wood" if wood else &"bullet_hit_ground", r.position)
-		FX.dust(r.position, r.normal)
+		FX.impact(r.position, r.normal, &"wood" if wood else &"ground")
 	return result
 
 

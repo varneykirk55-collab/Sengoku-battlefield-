@@ -18,3 +18,8 @@ Kengeki and ASHIGARU were only read from; nothing in those repositories was chan
   Multimesh pines/bamboo/grass, procedural materials, golden-hour sky/sun): original code and
   procedural primitives generated in-engine for this project (Bot 3). No third-party meshes,
   textures, or sound. See [docs/ENVIRONMENT.md](docs/ENVIRONMENT.md).
+
+## Combat / VFX overhaul (`bot2/combat-audio`)
+- Soft particle textures in `assets/vfx/`: procedural PNGs (CC0).
+- Voice/SFX replacements: see `audio/LICENSES.md`.
+- Matchlock mesh remains TEMP procedural (no third-party musket GLB).

@@ -16,3 +16,8 @@ Source: `C:\Users\aresg\OneDrive\Desktop\Recovered_Weapon_Assets\` (originals un
 - The GLB's cock/frizzen/trigger animations are imported but not played.
 - Offsets come from the mesh bounds and haven't been checked in rendered footage yet. Hand/cheek contact may need a small tweak.
 - About 66k tris. Only the player has one.
+
+## combat-audio merge note (Bot 2)
+- Kept combat-audio katana mounts: `KATANA_IN_HAND` origin `(0,-0.02,0)`, `KATANA_SHEATHED` `(0,0.02,0)`, `MATCHLOCK_MOUNT` IDENTITY.
+- AI path keeps TEMP improved procedural `_matchlock()` (not Rob baseline stub).
+- Player detailed path: Flintlock.glb + Muzzle `(0,1.20,0)` from 3d70bdb.

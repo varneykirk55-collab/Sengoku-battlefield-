@@ -6,43 +6,42 @@ extends RefCounted
 ## variation of that event. To replace a placeholder, drop new .wav/.ogg/.mp3 files into the
 ## folder and delete the TEMP_ ones. To tune loudness, range or voice limits, edit the table below.
 ##
-## Keys: bus, vol (dB), pri (0-100), max (simultaneous), range (m), unit (m), cool (s),
-##       spatial (bool), loop (bool), far / far_at (distant-variant event and switch distance),
-##       pitch (pitch jitter).
+## Keys: bus (Weapons/Impacts/Voice/SFX/UI/Ambience), vol (dB), pri, max, range, unit, cool,
+##       spatial, loop, far / far_at, pitch.
 
 const SFX_ROOT := "res://audio/sfx"
 const AUDIO_EXTENSIONS := ["wav", "ogg", "mp3"]
 
 const EVENTS := {
 	# --- katana ---
-	"katana_swing_light": {"pri": 40, "max": 8, "range": 35, "unit": 6, "vol": -2},
-	"katana_swing_heavy": {"pri": 45, "max": 6, "range": 40, "unit": 7},
-	"katana_hit": {"pri": 70, "max": 8, "range": 45, "unit": 8},
-	"katana_hit_world": {"pri": 35, "max": 4, "range": 35, "unit": 6},
-	"katana_draw": {"pri": 30, "max": 3, "range": 25, "unit": 4},
-	"blade_clash": {"pri": 65, "max": 6, "range": 50, "unit": 8},
-	"blade_block": {"pri": 55, "max": 6, "range": 45, "unit": 7},
+	"katana_swing_light": {"bus": "Weapons", "pri": 40, "max": 8, "range": 35, "unit": 6, "vol": -2},
+	"katana_swing_heavy": {"bus": "Weapons", "pri": 45, "max": 6, "range": 40, "unit": 7},
+	"katana_hit": {"bus": "Weapons", "pri": 70, "max": 8, "range": 45, "unit": 8},
+	"katana_hit_world": {"bus": "Weapons", "pri": 35, "max": 4, "range": 35, "unit": 6},
+	"katana_draw": {"bus": "Weapons", "pri": 30, "max": 3, "range": 25, "unit": 4},
+	"blade_clash": {"bus": "Weapons", "pri": 65, "max": 6, "range": 50, "unit": 8},
+	"blade_block": {"bus": "Weapons", "pri": 55, "max": 6, "range": 45, "unit": 7},
 	# --- matchlock ---
-	"matchlock_fire": {"pri": 90, "max": 8, "range": 90, "unit": 22, "pitch": 0.04, "far": "matchlock_fire_far", "far_at": 70},
-	"matchlock_fire_far": {"pri": 60, "max": 5, "range": 600, "unit": 70, "pitch": 0.05},
-	"matchlock_dry": {"pri": 40, "max": 2, "range": 20, "unit": 4},
-	"reload_powder": {"pri": 35, "max": 4, "range": 20, "unit": 4},
-	"reload_ball": {"pri": 35, "max": 4, "range": 20, "unit": 4},
-	"reload_ram": {"pri": 35, "max": 4, "range": 20, "unit": 4},
-	"reload_prime": {"pri": 35, "max": 4, "range": 20, "unit": 4},
-	"reload_match": {"pri": 35, "max": 4, "range": 20, "unit": 4},
-	"weapon_raise": {"pri": 30, "max": 3, "range": 15, "unit": 3},
-	"weapon_lower": {"pri": 30, "max": 3, "range": 15, "unit": 3},
-	"bullet_whiz": {"pri": 80, "max": 3, "range": 20, "unit": 4},
-	"bullet_hit_flesh": {"pri": 70, "max": 6, "range": 50, "unit": 8},
-	"bullet_hit_ground": {"pri": 40, "max": 6, "range": 50, "unit": 8},
-	"bullet_hit_wood": {"pri": 40, "max": 6, "range": 50, "unit": 8},
+	"matchlock_fire": {"bus": "Weapons", "pri": 90, "max": 8, "range": 90, "unit": 22, "pitch": 0.04, "far": "matchlock_fire_far", "far_at": 70},
+	"matchlock_fire_far": {"bus": "Weapons", "pri": 60, "max": 5, "range": 600, "unit": 70, "pitch": 0.05},
+	"matchlock_dry": {"bus": "Weapons", "pri": 40, "max": 2, "range": 20, "unit": 4},
+	"reload_powder": {"bus": "Weapons", "pri": 35, "max": 4, "range": 20, "unit": 4},
+	"reload_ball": {"bus": "Weapons", "pri": 35, "max": 4, "range": 20, "unit": 4},
+	"reload_ram": {"bus": "Weapons", "pri": 35, "max": 4, "range": 20, "unit": 4},
+	"reload_prime": {"bus": "Weapons", "pri": 35, "max": 4, "range": 20, "unit": 4},
+	"reload_match": {"bus": "Weapons", "pri": 35, "max": 4, "range": 20, "unit": 4},
+	"weapon_raise": {"bus": "Weapons", "pri": 30, "max": 3, "range": 15, "unit": 3},
+	"weapon_lower": {"bus": "Weapons", "pri": 30, "max": 3, "range": 15, "unit": 3},
+	"bullet_whiz": {"bus": "Weapons", "pri": 80, "max": 3, "range": 20, "unit": 4},
+	"bullet_hit_flesh": {"bus": "Impacts", "pri": 70, "max": 6, "range": 50, "unit": 8},
+	"bullet_hit_ground": {"bus": "Impacts", "pri": 40, "max": 6, "range": 50, "unit": 8},
+	"bullet_hit_wood": {"bus": "Impacts", "pri": 40, "max": 6, "range": 50, "unit": 8},
 	# --- bodies ---
-	"footstep": {"pri": 20, "max": 10, "range": 25, "unit": 3, "vol": -4},
-	"land": {"pri": 25, "max": 6, "range": 25, "unit": 4},
-	"hurt": {"pri": 55, "max": 6, "range": 45, "unit": 7},
-	"death_cry": {"pri": 60, "max": 5, "range": 60, "unit": 9},
-	"body_fall": {"pri": 40, "max": 5, "range": 35, "unit": 6},
+	"footstep": {"bus": "Impacts", "pri": 20, "max": 10, "range": 25, "unit": 3, "vol": -4},
+	"land": {"bus": "Impacts", "pri": 25, "max": 6, "range": 25, "unit": 4},
+	"hurt": {"bus": "Voice", "pri": 55, "max": 6, "range": 45, "unit": 7},
+	"death_cry": {"bus": "Voice", "pri": 60, "max": 5, "range": 60, "unit": 9},
+	"body_fall": {"bus": "Impacts", "pri": 40, "max": 5, "range": 35, "unit": 6},
 	"battle_cry": {"bus": "Voice", "pri": 45, "max": 4, "range": 70, "unit": 10, "cool": 0.3},
 	# --- player feedback & UI (not positional) ---
 	"respawn": {"bus": "UI", "spatial": false, "pri": 90, "max": 1},
