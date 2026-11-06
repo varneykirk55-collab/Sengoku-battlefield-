@@ -1,10 +1,10 @@
 class_name WeaponModels
 extends RefCounted
-## Weapon meshes and where they sit on the Rōnin rig.
+## Weapon meshes and where they sit on the samurai rig.
 ##
 ## Conventions (bone space): blades and barrels point along +Y.
 ##   katana in hand  -> `weapon_r` bone      sheathed -> `katana_sheath` bone
-##   matchlock       -> `musket_ctrl` bone: the Rōnin clips move this bone to the shoulder for
+##   matchlock       -> `musket_ctrl` bone: the samurai clips move this bone to the shoulder for
 ##                      aim / fire / reload and onto the back otherwise, so the gun is shouldered
 ##                      or slung automatically.
 ## AI soldiers use procedural low-poly models merged into one mesh (one draw call each);

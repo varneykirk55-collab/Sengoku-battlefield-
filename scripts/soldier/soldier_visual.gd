@@ -1,24 +1,32 @@
 class_name SoldierVisual
 extends Node3D
-## Placeholder body: the Rōnin model from ASHIGARU, driven by an AnimationTree.
+## Samurai body: armored model from Bot 1, driven by an AnimationTree.
 ##   * Locomotion (idle / walk / run) plays on the whole body.
 ##   * Actions (katana slash, matchlock fire / reload, hit reactions) and the matchlock aim pose
 ##     play on the upper body only, so soldiers keep moving while fighting.
 ##   * Death switches to a full-body clip.
-## Each soldier carries a sashimono (back banner) and tinted kimono in its faction colour.
+## Each soldier carries a sashimono (back banner) and faction armor materials (red / blue).
 ## Animation can be updated at a reduced rate for distant soldiers (see update_interval).
 
-const MODEL := preload("res://assets/characters/ronin/Ronin.glb")
+const MODEL := preload("res://assets/characters/samurai/sengoku_samurai_anims.glb")
 const CLIP := {
 	&"idle": "Idle", &"walk": "Walk", &"run": "Run", &"slash": "Katana_Slash", &"aim": "Musket_Aim",
 	&"fire": "Musket_Fire", &"reload": "Musket_Reload", &"hit": "Hit_React", &"death": "Death",
 }
 const LOOPING := ["Idle", "Walk", "Run", "Musket_Aim"]
-## Meshes hidden from the first-person camera (render layer 2) so the view isn't blocked.
-const HEAD_MESHES := ["Ronin_Hair", "Ronin_Brows", "Ronin_EyeLashes", "Ronin_Eyes", "Ronin_Knot", "Ronin_KnotTails"]
+## Single armor mesh (Samurai_GameMesh) — no separate head parts to hide in first person.
+const HEAD_MESHES := []
 const FIRST_PERSON_HIDDEN_LAYER := 2
 const BANNER_COLORS := [Color(0.78, 0.12, 0.1), Color(0.12, 0.28, 0.75)]
-const KIMONO_TINTS := [Color(1.0, 0.78, 0.74), Color(0.74, 0.82, 1.0)]
+const ARMOR_ALBEDO := [
+	"res://assets/characters/samurai/textures/SamuraiArmor_Red_BaseColor.png",
+	"res://assets/characters/samurai/textures/SamuraiArmor_Blue_BaseColor.png",
+]
+const ARMOR_METALLIC := "res://assets/characters/samurai/textures/SamuraiArmor_Shared_Metallic.png"
+const ARMOR_ROUGHNESS := "res://assets/characters/samurai/textures/SamuraiArmor_Shared_Roughness.png"
+const ARMOR_NORMAL := "res://assets/characters/samurai/textures/SamuraiArmor_Shared_Normal.png"
+## Death clip dips armor plates ~10 cm through the floor; lift the visual by this amount while dead.
+const DEATH_FLOOR_NUDGE := 0.10
 
 const P_LOCO := &"parameters/loco/blend_position"
 const P_LOCO_SPEED := &"parameters/loco_speed/scale"
@@ -31,7 +39,7 @@ const DRAW_DISTANCE := 260.0
 
 static var _library: AnimationLibrary
 static var _upper_paths: Array[NodePath] = []
-static var _kimono_materials: Dictionary = {}
+static var _armor_materials: Dictionary = {}
 static var _banner_materials: Dictionary = {}
 
 var model: Node3D
@@ -50,7 +58,7 @@ var gun_mount: Node3D
 var _gun_bone := -1
 var stance: StringName = &"none"
 ## When set (non-zero), the shouldered matchlock points along this world direction instead of
-## the clip's bone angle (the Rōnin aim clip holds the gun ~30 degrees off the line of sight).
+## the clip's bone angle (the aim clip holds the gun ~30 degrees off the line of sight).
 var gun_aim_dir := Vector3.ZERO
 var dead := false
 ## Seconds between animation updates (0 = every frame). Raised for distant soldiers.
@@ -61,11 +69,13 @@ var _last_gait := -1.0
 var _last_scale := -1.0
 var _action_end := 0.0
 var _time := 0.0
+var _model_base_y := 0.0
 
 
 func setup(faction: int) -> void:
 	model = MODEL.instantiate()
 	model.rotation.y = PI  # the model faces +Z; Godot's forward is -Z
+	_model_base_y = model.position.y
 	add_child(model)
 	skeleton = model.find_children("*", "Skeleton3D", true, false)[0]
 	anim = model.find_children("*", "AnimationPlayer", true, false)[0]
@@ -102,7 +112,7 @@ func set_locomotion(speed: float, grounded: bool) -> void:
 	if speed > 0.1:
 		scale = clampf(speed / 1.4, 0.7, 1.6) if speed < 2.4 else clampf(speed / 2.6, 1.0, 2.4)
 	if not grounded:
-		scale = 0.25  # hang in the stride while airborne (no jump clip on the placeholder rig)
+		scale = 0.25  # hang in the stride while airborne (no jump clip on this rig)
 	if absf(scale - _last_scale) > 0.01:
 		_last_scale = scale
 		tree.set(P_LOCO_SPEED, scale)
@@ -155,6 +165,9 @@ func hit_react() -> void:
 func die() -> void:
 	dead = true
 	tree.active = false
+	# Nudge visual up so armor plates don't clip through the floor (~10 cm in the Death clip).
+	if model:
+		model.position.y = _model_base_y + DEATH_FLOOR_NUDGE
 	anim.play(CLIP[&"death"], 0.1)
 	anim.advance(0.0)
 
@@ -162,6 +175,8 @@ func die() -> void:
 func reset() -> void:
 	dead = false
 	_action_end = 0.0
+	if model:
+		model.position.y = _model_base_y
 	anim.stop()
 	tree.active = true
 	set_stance(stance)
@@ -172,6 +187,7 @@ func reset() -> void:
 
 
 ## Hides head geometry from cameras that exclude render layer 2 (the first-person camera).
+## Samurai is a single mesh; nothing separate to hide — call is a no-op until split meshes exist.
 func use_first_person_layers() -> void:
 	for name in HEAD_MESHES:
 		var mi := skeleton.get_node_or_null(name) as MeshInstance3D
@@ -325,15 +341,11 @@ func _attach(bone: String) -> BoneAttachment3D:
 
 func _apply_faction(faction: int) -> void:
 	faction = clampi(faction, 0, 1)
-	var kimono := skeleton.get_node_or_null("Ronin_Kimono") as MeshInstance3D
-	if kimono:
-		if not _kimono_materials.has(faction):
-			var base := kimono.get_active_material(0)
-			var m := base.duplicate() as Material
-			if m is BaseMaterial3D:
-				(m as BaseMaterial3D).albedo_color = KIMONO_TINTS[faction]
-			_kimono_materials[faction] = m
-		kimono.set_surface_override_material(0, _kimono_materials[faction])
+	var armor := _find_armor_mesh()
+	if armor:
+		if not _armor_materials.has(faction):
+			_armor_materials[faction] = _make_armor_mat(ARMOR_ALBEDO[faction])
+		armor.set_surface_override_material(0, _armor_materials[faction])
 	if not _banner_materials.has(faction):
 		var bm := StandardMaterial3D.new()
 		bm.albedo_color = BANNER_COLORS[faction]
@@ -363,6 +375,31 @@ func _apply_faction(faction: int) -> void:
 	flag.material_override = _banner_materials[faction]
 	flag.position = Vector3(0.19, 0.78, 0)
 	banner.add_child(flag)
+
+
+func _find_armor_mesh() -> MeshInstance3D:
+	var named := skeleton.get_node_or_null("Samurai_GameMesh") as MeshInstance3D
+	if named:
+		return named
+	for mi in skeleton.get_children():
+		if mi is MeshInstance3D:
+			return mi as MeshInstance3D
+	# Some GLB imports nest the mesh under an intermediate node.
+	var found := model.find_children("*", "MeshInstance3D", true, false)
+	return found[0] as MeshInstance3D if not found.is_empty() else null
+
+
+static func _make_armor_mat(albedo_path: String) -> StandardMaterial3D:
+	var m := StandardMaterial3D.new()
+	m.albedo_texture = load(albedo_path)
+	m.metallic_texture = load(ARMOR_METALLIC)
+	m.metallic_texture_channel = BaseMaterial3D.TEXTURE_CHANNEL_RED
+	m.metallic = 1.0
+	m.roughness_texture = load(ARMOR_ROUGHNESS)
+	m.roughness_texture_channel = BaseMaterial3D.TEXTURE_CHANNEL_RED
+	m.normal_enabled = true
+	m.normal_texture = load(ARMOR_NORMAL)
+	return m
 
 
 static var _pole_mat: StandardMaterial3D
