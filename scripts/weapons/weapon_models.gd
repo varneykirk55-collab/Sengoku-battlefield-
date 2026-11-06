@@ -9,14 +9,21 @@ extends RefCounted
 ##                      or slung automatically.
 ## Player katana: detailed Katana.glb. AI katana: mid-detail procedural (one draw call) for mass
 ## battles — flip USE_DETAILED_AI_KATANA if profiling allows instanced GLBs.
-## Matchlock: TEMP improved procedural tanegashima (no licensed GLB in-repo). Replace make_matchlock()
-## when a real asset arrives. Do NOT import Iron Crowns Napoleonic muskets without Kirk approval.
+## Player matchlock: recovered Flintlock.glb (visual stand-in; no match glow / serpentine).
+## AI matchlock: TEMP improved procedural tanegashima (one draw call). Do NOT import Iron Crowns
+## Napoleonic musket meshes without Kirk approval.
 
 const DETAILED_KATANA := preload("res://assets/weapons/Katana.glb")
 const USE_DETAILED_AI_KATANA := false
 ## After Bot 1 socket repair (9845cd1): IDENTITY mounts; optional grip polish −0.02 m Y.
 const KATANA_IN_HAND := Transform3D(Basis.IDENTITY, Vector3(0, -0.02, 0))
 const KATANA_SHEATHED := Transform3D(Basis.IDENTITY, Vector3(0, 0.02, 0))  # saya along left waist; nudge +X only if armor clips
+const DETAILED_MATCHLOCK := preload("res://assets/weapons/Flintlock.glb")
+## Flintlock.glb: root at butt, +X muzzle, +Y top of gun, lock on +Z. Map X->+Y (barrel),
+## Y->+Z (top), Z->+X (lock on the right), then shift so barrel axis runs through the bone.
+const DETAILED_MATCHLOCK_XFORM := Transform3D(
+		Basis(Vector3(0, 1, 0), Vector3(0, 0, 1), Vector3(1, 0, 0)), Vector3(0, -0.24, -0.10))
+const DETAILED_MUZZLE := Vector3(0, 1.20, 0)
 const MATCHLOCK_MOUNT := Transform3D(Basis.IDENTITY, Vector3(0, 0, 0))
 
 static var _katana_mesh: ArrayMesh
@@ -52,7 +59,7 @@ static func _show_scabbard(model: Node3D, on: bool) -> void:
 
 static func mount_matchlock(w: Weapon) -> void:
 	if w.model == null:
-		w.model = make_matchlock()
+		w.model = make_matchlock(w.soldier.is_player)
 	_reparent(w.model, w.soldier.visual.gun_mount, MATCHLOCK_MOUNT)
 
 
@@ -103,15 +110,25 @@ static func make_katana(detailed: bool) -> Node3D:
 	return root
 
 
-## TEMP procedural tanegashima — readable stock/barrel/lock/serpentine until a real GLB ships.
-static func make_matchlock() -> Node3D:
+## Player: Flintlock.glb (detailed). AI/default: TEMP improved procedural tanegashima.
+static func make_matchlock(detailed: bool = false) -> Node3D:
 	var root := Node3D.new()
+	root.name = "MatchlockModel"
+	if detailed:
+		var g: Node3D = DETAILED_MATCHLOCK.instantiate()
+		g.transform = DETAILED_MATCHLOCK_XFORM
+		root.add_child(g)
+		var m := Marker3D.new()
+		m.name = "Muzzle"
+		m.position = DETAILED_MUZZLE
+		root.add_child(m)
+		return root
 	root.name = "MatchlockModel_TEMP"
 	var mi := MeshInstance3D.new()
 	mi.mesh = _matchlock()
 	mi.material_override = _mat()
 	root.add_child(mi)
-	# Smouldering match cord tip in the serpentine jaw.
+	# Smouldering match cord tip in the serpentine jaw (procedural AI gun only).
 	var glow := MeshInstance3D.new()
 	var s := SphereMesh.new()
 	s.radius = 0.007
@@ -125,7 +142,7 @@ static func make_matchlock() -> Node3D:
 	root.add_child(glow)
 	var muzzle := Marker3D.new()
 	muzzle.name = "Muzzle"
-	muzzle.position = Vector3(0, 1.16, 0)  # barrel tip along +Y
+	muzzle.position = Vector3(0, 1.14, 0)  # AI procedural barrel tip (Rob convention)
 	root.add_child(muzzle)
 	return root
 
