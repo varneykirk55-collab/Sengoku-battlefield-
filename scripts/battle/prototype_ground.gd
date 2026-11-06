@@ -87,10 +87,10 @@ static func make_battlefield_environment() -> WorldEnvironment:
 	# Neutral-cool ambient so local albedo (greens) show through.
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
 	env.ambient_light_color = Color(0.62, 0.7, 0.78)
-	env.ambient_light_energy = 0.42
+	env.ambient_light_energy = 0.48
 	env.ambient_light_sky_contribution = 0.35
 	env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
-	env.tonemap_exposure = 0.92
+	env.tonemap_exposure = 0.95
 	env.tonemap_white = 5.5
 	env.fog_enabled = true
 	# Cool soft haze — no amber wash.
@@ -103,7 +103,10 @@ static func make_battlefield_environment() -> WorldEnvironment:
 	env.glow_strength = 0.6
 	env.glow_bloom = 0.02
 	env.glow_blend_mode = Environment.GLOW_BLEND_MODE_SOFTLIGHT
-	env.ssao_enabled = false
+	env.ssao_enabled = true
+	env.ssao_radius = 1.2
+	env.ssao_intensity = 0.85
+	env.ssao_power = 1.5
 	env.adjustment_enabled = false
 	we.environment = env
 	return we
@@ -113,9 +116,9 @@ static func make_battlefield_sun() -> DirectionalLight3D:
 	var sun := DirectionalLight3D.new()
 	sun.name = "Sun"
 	# Mid-afternoon, warm-white (not orange). Greens retain hue under this light.
-	sun.rotation_degrees = Vector3(-42, -48, 0)
-	sun.light_color = Color(1.0, 0.96, 0.88)
-	sun.light_energy = 1.55
+	sun.rotation_degrees = Vector3(-38, -50, 0)
+	sun.light_color = Color(1.0, 0.94, 0.86)
+	sun.light_energy = 1.5
 	sun.light_indirect_energy = 0.85
 	sun.light_specular = 0.7
 	sun.shadow_enabled = true

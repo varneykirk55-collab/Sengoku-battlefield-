@@ -80,3 +80,37 @@ Training Range still uses original cooler `make_environment` / `make_sun`.
 - Low-poly primitive art direction remains; further leaps need authored meshes or custom shaders (not Hunyuan).
 - Grass quads help at mid distance; ground still benefits from a real grass shader later.
 - Merge to `main` needs Kirk’s approval.
+
+
+## v3 cinematic pass (asset quality)
+
+Prior passes (v1 amber filter, v2 greener albedo) still read as unfinished because trees were
+primitive cones and ground was a flat sheet. **v3 upgrades asset quality**, not just grading.
+
+### Asset upgrades
+| Area | Change |
+|---|---|
+| Terrain | `assets/env/terrain_blend.gdshader` — grass/dirt/rock blend from vertex weights + albedo/normal textures |
+| Textures | Original procedural PNGs in `assets/env/textures/` (grass, dirt, rock, bark, foliage) |
+| Trees | Blender GLB Japanese pine / sugi tiers (`pine.glb`, `pine_lod.glb`) via MultiMesh + LOD |
+| Shrubs | `shrub.glb` MultiMesh clusters + stream-bank placement |
+| Grass | Dense crossed tufts (`EnvMeshes.grass_tuft`) with density variation |
+| Architecture | Blender `hut.glb` (posts, platform, thatch), `torii.glb` (proper kasagi/nuki), `rock.glb` |
+| Lighting | Warm-white sun, cool ambient, mild SSAO; greens stay green (no amber fog) |
+| Fallback | `scripts/battle/env_meshes.gd` procedural pines if GLB missing |
+
+### Evidence
+- Baseline (post-v2 on main): `docs/env_before_v3/`
+- After v3: `docs/env_after_v3/`
+- Compares: `docs/env_demo/compare_v2_v3_*.png`
+- Tour / gameplay: `docs/env_demo/env_after_v3_tour.mp4`, `gameplay_demo_v3.mp4`, `gameplay_frames/aerial.png`
+
+### Perf
+- `SIM_SECONDS=20 SIM_SOLDIERS=16` → ~2.1 ms CPU/frame
+- Nav rebaked only because rock/hut colliders changed (map size unchanged)
+
+### Remaining limitations
+- Software OpenGL screenshots understate normals/SSAO vs a real GPU
+- Still stylized/low-poly by design — not Ghost-of-Tsushima mesh density
+- Further gains: authored leaf cards, wind shaders, more unique camp props
+- **Merge to main needs Kirk approval**
