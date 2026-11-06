@@ -13,3 +13,8 @@
 - **Engine**: Godot 4.7.2, MIT License. https://godotengine.org/license/
 
 Kengeki and ASHIGARU were only read from; nothing in those repositories was changed.
+
+- **Battlefield environment overhaul** (`scripts/battle/battlefield.gd`, `prototype_ground.gd`,
+  Multimesh pines/bamboo/grass, procedural materials, golden-hour sky/sun): original code and
+  procedural primitives generated in-engine for this project (Bot 3). No third-party meshes,
+  textures, or sound. See [docs/ENVIRONMENT.md](docs/ENVIRONMENT.md).
