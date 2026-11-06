@@ -3,7 +3,7 @@ extends Node3D
 ## The prototype battlefield, generated deterministically from code (primitives only):
 ## rolling terrain with a central hill and a stream valley, three capture points (A, B, C),
 ## two faction camps, and cover (rocks, palisades, stone walls, huts, a torii, pines,
-## bamboo groves, grass, dirt roads). Bot 3 environment overhaul — cinematic golden hour.
+## bamboo groves, grass, dirt roads). Bot 3 env overhaul v2 — vibrant greens, neutral-warm light.
 ##
 ## Layout (top view, -Z is north):
 ##                 north camp (faction 1, blue)        z = -128
@@ -60,15 +60,16 @@ func _ready() -> void:
 	_noise.frequency = 0.012
 	_noise.fractal_octaves = 3
 	_rng.seed = SEED
-	_wood = _wood_mat(Color(0.48, 0.32, 0.16))
-	_dark_wood = _wood_mat(Color(0.2, 0.12, 0.07))
-	_stone = _stone_mat(Color(0.52, 0.48, 0.42))
-	_thatch = _mat(Color(0.62, 0.48, 0.26), 0.92)
-	_bamboo = _mat(Color(0.42, 0.55, 0.22), 0.7)
-	_foliage_dark = _mat(Color(0.12, 0.28, 0.12), 0.85)
-	_foliage_mid = _mat(Color(0.18, 0.36, 0.14), 0.8)
-	_foliage_lit = _mat(Color(0.28, 0.46, 0.16), 0.75)
-	_grass_mat = _mat(Color(0.32, 0.48, 0.16), 0.88)
+	# Distinct per-material palette — saturated greens, oak wood, cool stone (no olive-brown wash).
+	_wood = _wood_mat(Color(0.58, 0.4, 0.22))
+	_dark_wood = _wood_mat(Color(0.22, 0.14, 0.08))
+	_stone = _stone_mat(Color(0.52, 0.54, 0.56))
+	_thatch = _mat(Color(0.74, 0.6, 0.34), 0.9)
+	_bamboo = _foliage_mat(Color(0.4, 0.7, 0.28), 0.55, 0.08)
+	_foliage_dark = _foliage_mat(Color(0.04, 0.28, 0.08), 0.8, 0.0)
+	_foliage_mid = _foliage_mat(Color(0.1, 0.52, 0.14), 0.68, 0.06)
+	_foliage_lit = _foliage_mat(Color(0.3, 0.72, 0.18), 0.52, 0.18)
+	_grass_mat = _foliage_mat(Color(0.28, 0.68, 0.16), 0.72, 0.08)
 	add_child(PrototypeGround.make_battlefield_environment())
 	var sun := PrototypeGround.make_battlefield_sun()
 	add_child(sun)
@@ -196,7 +197,7 @@ func _build_terrain() -> void:
 			var n := Vector3(-hx, 2.0, -hz).normalized()
 			st.set_normal(n)
 			st.set_color(_ground_color(x, z, h, n))
-			st.set_uv(Vector2(x, z) * 0.12)
+			st.set_uv(Vector2(x, z) * 0.08)
 			st.add_vertex(Vector3(x, h, z))
 	for zi in d - 1:
 		for xi in w - 1:
@@ -215,60 +216,61 @@ func _build_terrain() -> void:
 
 
 func _ground_color(x: float, z: float, h: float, n: Vector3) -> Color:
-	# Rich Sengoku palette: deep greens, warm earth, golden highlights.
+	# Saturated grass greens that stay green under warm-white sun. Dirt/stone only where intended.
 	var n1 := clampf(_noise.get_noise_2d(x * 3.0, z * 3.0) + 0.5, 0.0, 1.0)
-	var n2 := clampf(_noise.get_noise_2d(x * 7.0 + 40.0, z * 7.0) + 0.5, 0.0, 1.0)
-	var grass_a := Color(0.22, 0.38, 0.14)
-	var grass_b := Color(0.38, 0.52, 0.18)
-	var grass_c := Color(0.48, 0.55, 0.22)  # sun-warmed
-	var grass := grass_a.lerp(grass_b, n1).lerp(grass_c, n2 * 0.35)
-	var dirt := Color(0.46, 0.32, 0.18)
-	var dirt_warm := Color(0.55, 0.38, 0.2)
-	var rock := Color(0.4, 0.38, 0.34)
+	var n2 := clampf(_noise.get_noise_2d(x * 8.0 + 40.0, z * 8.0) + 0.5, 0.0, 1.0)
+	var n3 := clampf(_noise.get_noise_2d(x * 1.2 - 80.0, z * 1.2) + 0.5, 0.0, 1.0)
+	# True greens (high G, moderate R, low B) — not olive/mustard.
+	var grass_a := Color(0.1, 0.4, 0.12)
+	var grass_b := Color(0.18, 0.55, 0.18)
+	var grass_c := Color(0.32, 0.68, 0.22)  # bright spring patch
+	var grass := grass_a.lerp(grass_b, n1).lerp(grass_c, n2 * 0.55)
+	# Stronger moss / meadow patch contrast (still green, not brown).
+	grass = grass.lerp(Color(0.06, 0.3, 0.1), clampf(n3 - 0.5, 0.0, 0.45) * 1.6)
+	grass = grass.lerp(Color(0.4, 0.72, 0.28), clampf(n2 - 0.65, 0.0, 0.3) * 1.2)
+	var dirt := Color(0.4, 0.28, 0.16)
+	var soil := Color(0.34, 0.24, 0.14)
+	var rock := Color(0.48, 0.5, 0.52)
 	var slope := 1.0 - n.y
-	var c := grass.lerp(dirt.lerp(dirt_warm, n1), clampf(slope * 5.5 - 0.25, 0.0, 1.0))
-	c = c.lerp(rock, clampf(slope * 4.5 - 1.0, 0.0, 1.0))
-	# Height tint: cooler in valleys, warmer on rises catching sun.
-	c = c.lerp(Color(0.55, 0.5, 0.28), clampf((h - 2.0) / 10.0, 0.0, 0.25))
-	# Trampled ground around camps and objectives.
+	var c := grass
+	# Exposed soil only on steeper slopes — keep most of the field green.
+	c = c.lerp(dirt.lerp(soil, n1), clampf(slope * 7.0 - 0.8, 0.0, 0.85))
+	c = c.lerp(rock, clampf(slope * 5.5 - 1.4, 0.0, 1.0))
+	# Slight cooler shade in valleys (more green-blue), no yellow height wash.
+	if h < 1.0:
+		c = c.lerp(Color(0.12, 0.4, 0.2), clampf((1.0 - h) / 4.0, 0.0, 0.2))
+	# Trampled ground around camps and objectives (contained dirt, not map-wide brown).
 	for o in OBJECTIVES:
 		var p: Vector2 = o.pos
-		c = c.lerp(dirt, clampf(1.0 - Vector2(x, z).distance_to(p) / 13.0, 0.0, 0.7))
+		c = c.lerp(dirt, clampf(1.0 - Vector2(x, z).distance_to(p) / 11.0, 0.0, 0.65))
 	for cp: Vector2 in CAMPS:
-		c = c.lerp(dirt, clampf(1.0 - Vector2(x, z).distance_to(cp) / 18.0, 0.0, 0.5))
-	# Dirt roads.
+		c = c.lerp(dirt, clampf(1.0 - Vector2(x, z).distance_to(cp) / 16.0, 0.0, 0.45))
+	# Dirt roads — clear paths, strong contrast against green.
 	var rw := _road_weight(x, z)
 	if rw > 0.0:
-		c = c.lerp(Color(0.5, 0.36, 0.2), rw * 0.85)
-	# Stream bed.
+		c = c.lerp(Color(0.45, 0.32, 0.18), rw * 0.92)
+	# Stream bed — cool wet stone/sand, not brown.
 	var stream_z := -70.0 + 14.0 * sin(x / 32.0)
 	if absf(z - stream_z) < 2.5 and h < 0.0:
-		c = Color(0.28, 0.34, 0.32).lerp(Color(0.35, 0.42, 0.4), n1)
+		c = Color(0.3, 0.4, 0.38).lerp(Color(0.38, 0.48, 0.46), n1)
 	return c
 
 
 func _terrain_material() -> StandardMaterial3D:
 	var m := StandardMaterial3D.new()
 	m.vertex_color_use_as_albedo = true
-	var noise := FastNoiseLite.new()
-	noise.seed = SEED + 3
-	noise.frequency = 0.06
-	noise.fractal_octaves = 4
-	var tex := NoiseTexture2D.new()
-	tex.noise = noise
-	tex.seamless = true
-	tex.width = 256
-	tex.height = 256
-	var ramp := Gradient.new()
-	ramp.offsets = PackedFloat32Array([0.0, 0.45, 1.0])
-	ramp.colors = PackedColorArray([
-		Color(0.72, 0.7, 0.62),
-		Color(0.95, 0.94, 0.88),
-		Color(1.12, 1.1, 1.0),
-	])
-	tex.color_ramp = ramp
-	m.albedo_texture = tex
-	m.roughness = 0.92
+	# Subtle green-tinted micro-variation (CPU ImageTexture — headless-safe).
+	m.albedo_texture = _cpu_noise_albedo(
+		SEED + 3, 0.045, 256,
+		[Color(0.58, 0.8, 0.5), Color(0.96, 1.0, 0.94), Color(0.72, 0.94, 0.64)])
+	m.normal_enabled = true
+	m.normal_texture = _cpu_noise_normal(SEED + 9, 0.11, 256, 6.5)
+	m.normal_scale = 0.95
+	m.roughness = 0.86
+	m.roughness_texture = _cpu_noise_albedo(
+		SEED + 13, 0.12, 128,
+		[Color(0.55, 0.55, 0.55), Color(0.85, 0.85, 0.85), Color(1.0, 1.0, 1.0)])
+	m.roughness_texture_channel = BaseMaterial3D.TEXTURE_CHANNEL_RED
 	return m
 
 
@@ -293,7 +295,7 @@ func _build_stream_water() -> void:
 	var st := SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLE_STRIP)
 	var mat := StandardMaterial3D.new()
-	mat.albedo_color = Color(0.22, 0.38, 0.42, 0.55)
+	mat.albedo_color = Color(0.2, 0.5, 0.55, 0.5)
 	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	mat.roughness = 0.15
 	mat.metallic = 0.15
@@ -348,7 +350,7 @@ func _build_camp(faction: int, c: Vector2) -> void:
 	var facing := 0.0 if faction == 0 else PI  # camps face the battle
 	var color: Color = UIStyle.FACTION_COLORS[faction]
 	# Richer banner / curtain colors (more saturated, still readable).
-	var curtain := _mat(Color(0.94, 0.9, 0.8), 0.85)
+	var curtain := _mat(Color(0.95, 0.95, 0.92), 0.88)
 	var band := _mat(color.lightened(0.05).lerp(color, 0.7), 0.7)
 	band.albedo_color = Color(clampf(color.r * 1.15, 0.0, 1.0), clampf(color.g * 1.05, 0.0, 1.0), clampf(color.b * 1.05, 0.0, 1.0))
 	var away := 1.0 if faction == 0 else -1.0
@@ -518,7 +520,7 @@ func _build_bamboo() -> void:
 		return
 	var stalks := _multimesh(stalk, _bamboo, spots, Vector3(0, 3.5, 0))
 	stalks.name = "BambooStalks"
-	var leaves := _multimesh(leaf, _foliage_mid, spots, Vector3(0, 6.2, 0), 0.9)
+	var leaves := _multimesh(leaf, _foliage_lit, spots, Vector3(0, 6.2, 0), 0.9)
 	leaves.name = "BambooLeaves"
 	# Colliders every 3rd stalk so AI can path around without exploding cost.
 	var body := StaticBody3D.new()
@@ -539,26 +541,36 @@ func _build_bamboo() -> void:
 
 
 func _build_grass() -> void:
-	# Low grass clumps via MultiMesh — density kept modest; skip roads, objectives, camps.
-	var blade := PrismMesh.new()
-	blade.size = Vector3(0.35, 0.55, 0.12)
+	# Crossed quad clumps — reads as grass patches from distance, not neon sticks.
+	var quad := QuadMesh.new()
+	quad.size = Vector2(0.9, 0.85)
 	var spots: Array[Vector3] = []
-	for i in 420:
+	for i in 640:
 		var x := _rng.randf_range(-HALF_X + 20, HALF_X - 20)
 		var z := _rng.randf_range(-HALF_Z + 25, HALF_Z - 25)
 		var p := Vector2(x, z)
 		if _too_close_to_points(p, 12.0) or _road_weight(x, z) > 0.35:
 			continue
-		# Prefer mid-field and flanks; thin near stream bed.
 		var stream_z := -70.0 + 14.0 * sin(x / 32.0)
 		if absf(z - stream_z) < 4.0:
 			continue
-		spots.append(ground_point(x, z) + Vector3(0, 0.2, 0))
+		spots.append(ground_point(x, z) + Vector3(0, 0.35, 0))
 	if spots.is_empty():
 		return
-	var grass := _multimesh(blade, _grass_mat, spots, Vector3.ZERO, 1.0)
-	grass.name = "GrassClumps"
-	grass.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	var mat_a := _foliage_mat(Color(0.22, 0.6, 0.14), 0.7, 0.06)
+	mat_a.cull_mode = BaseMaterial3D.CULL_DISABLED
+	var mat_b := _foliage_mat(Color(0.34, 0.7, 0.18), 0.65, 0.1)
+	mat_b.cull_mode = BaseMaterial3D.CULL_DISABLED
+	var g1 := _multimesh(quad, mat_a, spots, Vector3.ZERO, 1.0)
+	g1.name = "GrassClumpsA"
+	g1.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	# Second set rotated ~90° via yaw in _multimesh hash — offset spots slightly for cross.
+	var spots2: Array[Vector3] = []
+	for s in spots:
+		spots2.append(s + Vector3(0.05, 0.0, 0.05))
+	var g2 := _multimesh(quad, mat_b, spots2, Vector3.ZERO, 0.95)
+	g2.name = "GrassClumpsB"
+	g2.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 
 
 func _build_distant_scenery() -> void:
@@ -652,7 +664,7 @@ func _hut(p: Vector3, yaw: float) -> void:
 
 func _torii(p: Vector3) -> void:
 	var base := ground_point(p.x, p.z)
-	var red := _mat(Color(0.78, 0.14, 0.08), 0.65)
+	var red := _mat(Color(0.88, 0.1, 0.06), 0.55)
 	for x in [-1.9, 1.9]:
 		_box(base + Vector3(x, 2.2, 0), Vector3(0.38, 4.4, 0.38), red, true)
 	_box(base + Vector3(0, 4.6, 0), Vector3(5.6, 0.4, 0.5), _dark_wood, false)
@@ -661,7 +673,7 @@ func _torii(p: Vector3) -> void:
 
 func _nobori(p: Vector3, color: Color) -> void:
 	_box(p + Vector3(0, 2.4, 0), Vector3(0.1, 4.8, 0.1), _dark_wood, false)
-	var vibrant := Color(clampf(color.r * 1.2, 0, 1), clampf(color.g * 1.1, 0, 1), clampf(color.b * 1.15, 0, 1))
+	var vibrant := Color(clampf(color.r * 1.35, 0, 1), clampf(color.g * 1.15, 0, 1), clampf(color.b * 1.3, 0, 1))
 	var flag := _panel(p + Vector3(0.4, 3.3, 0), Vector3(0.7, 2.6, 0.03), _mat(vibrant, 0.7), false)
 	flag.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 
@@ -715,17 +727,83 @@ func _mat(c: Color, roughness: float = 0.9) -> StandardMaterial3D:
 	return m
 
 
+func _foliage_mat(c: Color, roughness: float, emit: float = 0.0) -> StandardMaterial3D:
+	var m := _mat(c, roughness)
+	m.rim_enabled = true
+	m.rim = 0.4
+	m.rim_tint = 0.35
+	if emit > 0.0:
+		m.emission_enabled = true
+		m.emission = c.lightened(0.15)
+		m.emission_energy_multiplier = emit
+	return m
+
+
 func _wood_mat(c: Color) -> StandardMaterial3D:
-	# Slight value variation without NoiseTexture2D (keeps headless bake reliable).
-	var m := _mat(c, 0.82)
-	m.albedo_color = c.darkened(0.04)
+	var m := _mat(c, 0.78)
+	m.albedo_texture = _cpu_noise_albedo(
+		SEED + 11, 0.22, 128,
+		[c.darkened(0.18), c, c.lightened(0.12)])
+	m.uv1_triplanar = true
+	m.uv1_scale = Vector3(0.4, 0.4, 0.4)
+	m.roughness = 0.8
 	return m
 
 
 func _stone_mat(c: Color) -> StandardMaterial3D:
-	var m := _mat(c, 0.88)
-	m.albedo_color = c.lightened(0.03)
+	# Cool grey stone with faint moss undertone in the noise ramp.
+	var m := _mat(c, 0.86)
+	m.albedo_texture = _cpu_noise_albedo(
+		SEED + 17, 0.11, 128,
+		[c.darkened(0.12), c, Color(c.r * 0.9, minf(c.g * 1.08, 1.0), c.b * 0.95)])
+	m.uv1_triplanar = true
+	m.uv1_scale = Vector3(0.28, 0.28, 0.28)
+	m.normal_enabled = true
+	m.normal_texture = _cpu_noise_normal(SEED + 19, 0.16, 128, 7.0)
+	m.normal_scale = 0.8
 	return m
+
+
+## CPU-baked albedo ImageTexture (works headless; no NoiseTexture2D GPU wait).
+func _cpu_noise_albedo(tex_seed: int, freq: float, size: int, colors: Array) -> ImageTexture:
+	var noise := FastNoiseLite.new()
+	noise.seed = tex_seed
+	noise.frequency = freq
+	noise.fractal_octaves = 3
+	var img := Image.create(size, size, false, Image.FORMAT_RGB8)
+	var n_cols := colors.size()
+	for y in size:
+		for x in size:
+			var v := clampf(noise.get_noise_2d(float(x), float(y)) * 0.5 + 0.5, 0.0, 0.999)
+			var idx_f := v * float(n_cols - 1)
+			var i0 := int(idx_f)
+			var i1 := mini(i0 + 1, n_cols - 1)
+			var c: Color = (colors[i0] as Color).lerp(colors[i1] as Color, idx_f - float(i0))
+			img.set_pixel(x, y, c)
+	return ImageTexture.create_from_image(img)
+
+
+## CPU-baked normal map from height noise (Sobel).
+func _cpu_noise_normal(tex_seed: int, freq: float, size: int, strength: float) -> ImageTexture:
+	var noise := FastNoiseLite.new()
+	noise.seed = tex_seed
+	noise.frequency = freq
+	noise.fractal_octaves = 3
+	var heights := PackedFloat32Array()
+	heights.resize(size * size)
+	for y in size:
+		for x in size:
+			heights[y * size + x] = noise.get_noise_2d(float(x), float(y))
+	var img := Image.create(size, size, false, Image.FORMAT_RGB8)
+	for y in size:
+		for x in size:
+			var xl := heights[y * size + ((x - 1 + size) % size)]
+			var xr := heights[y * size + ((x + 1) % size)]
+			var yu := heights[((y - 1 + size) % size) * size + x]
+			var yd := heights[((y + 1) % size) * size + x]
+			var n := Vector3((xl - xr) * strength, 2.0, (yu - yd) * strength).normalized()
+			img.set_pixel(x, y, Color(n.x * 0.5 + 0.5, n.y * 0.5 + 0.5, n.z * 0.5 + 0.5))
+	return ImageTexture.create_from_image(img)
 
 
 # ----------------------------------------------------------------------------- navigation
