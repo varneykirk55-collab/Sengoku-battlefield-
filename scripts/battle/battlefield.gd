@@ -1128,7 +1128,9 @@ func _cpu_noise_normal(tex_seed: int, freq: float, size: int, strength: float) -
 			var xr := heights[y * size + ((x + 1) % size)]
 			var yu := heights[((y - 1 + size) % size) * size + x]
 			var yd := heights[((y + 1) % size) * size + x]
-			var n := Vector3((xl - xr) * strength, 2.0, (yu - yd) * strength).normalized()
+			# Tangent-space normal: Z (blue) is "up" out of the surface. (Was Y-up, which tilted
+			# shading ~90° and darkened stone props.)
+			var n := Vector3((xl - xr) * strength, (yu - yd) * strength, 2.0).normalized()
 			img.set_pixel(x, y, Color(n.x * 0.5 + 0.5, n.y * 0.5 + 0.5, n.z * 0.5 + 0.5))
 	return ImageTexture.create_from_image(img)
 
