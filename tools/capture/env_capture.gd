@@ -10,6 +10,11 @@ const CAMERAS := [
 	["04_camp_south", Vector3(35, 18, 155), Vector3(0, 4, 128)],
 	["05_stream_valley", Vector3(-40, 14, -55), Vector3(20, 2, -75)],
 	["06_midfield_lane", Vector3(-70, 16, 80), Vector3(-20, 6, 20)],
+	["07_arch_objective_a", Vector3(-30, 12, 70), Vector3(-55, 3, 45)],
+	["08_arch_objective_c", Vector3(80, 12, -20), Vector3(55, 3, -45)],
+	["09_camp_north_gate", Vector3(-30, 14, -95), Vector3(0, 4, -128)],
+	["10_grass_closeup", Vector3(-38, 2.6, 66), Vector3(-26, 0.4, 52)],
+	["11_gameplay_eye", Vector3(4, 2.2, 112), Vector3(0, 6, 0)],
 ]
 
 func _ready() -> void:
@@ -32,7 +37,10 @@ func _ready() -> void:
 	add_child(cam)
 	cam.current = true
 
+	var only := OS.get_environment("SHOT_ONLY")
 	for spec in CAMERAS:
+		if only != "" and not (spec[0] as String) in only.split(","):
+			continue
 		cam.global_position = spec[1]
 		cam.look_at(spec[2], Vector3.UP)
 		await get_tree().create_timer(wait).timeout

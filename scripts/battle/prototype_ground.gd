@@ -42,7 +42,7 @@ static func make_environment() -> WorldEnvironment:
 	sky.sky_material = mat
 	env.background_mode = Environment.BG_SKY
 	env.sky = sky
-	env.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
+	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
 	env.ambient_light_energy = 0.9
 	env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
 	env.fog_enabled = true
@@ -64,50 +64,60 @@ static func make_sun() -> DirectionalLight3D:
 	return sun
 
 
-## Cinematic battlefield look — warm sunlight without a brown/amber scene filter.
-## Greens must stay green: near-white sun + cool/neutral ambient and fog.
+## Bot3 v5 — neutral bright daytime (late morning, high sun). Natural greens come from
+## materials, not grading; lighting supplies contrast/grounding (crisp sun shadows, sky
+## ambient, SSAO/SSIL on Forward+). No warm/brown filter, restrained bloom.
 static func make_battlefield_environment() -> WorldEnvironment:
 	var we := WorldEnvironment.new()
 	we.name = "Environment"
 	var env := Environment.new()
 	var sky := Sky.new()
 	var mat := ProceduralSkyMaterial.new()
-	# Clear blue zenith; soft warm-white horizon (not orange amber).
-	mat.sky_top_color = Color(0.28, 0.48, 0.78)
-	mat.sky_horizon_color = Color(0.86, 0.88, 0.92)
-	mat.sky_curve = 0.09
-	mat.ground_horizon_color = Color(0.55, 0.58, 0.52)
-	mat.ground_bottom_color = Color(0.22, 0.24, 0.2)
+	mat.sky_top_color = Color(0.3, 0.5, 0.8)
+	mat.sky_horizon_color = Color(0.74, 0.8, 0.88)
+	mat.sky_curve = 0.12
+	mat.ground_horizon_color = Color(0.5, 0.53, 0.5)
+	mat.ground_bottom_color = Color(0.2, 0.21, 0.19)
 	mat.ground_curve = 0.1
-	mat.sun_angle_max = 22.0
-	mat.sun_curve = 0.1
+	mat.sun_angle_max = 18.0
+	mat.sun_curve = 0.12
 	sky.sky_material = mat
 	env.background_mode = Environment.BG_SKY
 	env.sky = sky
-	# Neutral-cool ambient so local albedo (greens) show through.
+	# Sky-driven ambient (blue-ish fill in shadow, keeps shadows from going muddy/black).
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	env.ambient_light_color = Color(0.62, 0.7, 0.78)
-	env.ambient_light_energy = 0.48
-	env.ambient_light_sky_contribution = 0.35
+	env.ambient_light_color = Color(0.6, 0.66, 0.74)
+	env.ambient_light_sky_contribution = 0.3
+	env.ambient_light_energy = 0.45
+	env.reflected_light_source = Environment.REFLECTION_SOURCE_SKY
 	env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
-	env.tonemap_exposure = 0.95
-	env.tonemap_white = 5.5
+	env.tonemap_exposure = 1.0
+	env.tonemap_white = 4.5
 	env.fog_enabled = true
-	# Cool soft haze — no amber wash.
-	env.fog_light_color = Color(0.78, 0.84, 0.9)
-	env.fog_density = 0.0010
-	env.fog_aerial_perspective = 0.22
-	env.fog_sky_affect = 0.25
+	env.fog_light_color = Color(0.72, 0.8, 0.9)
+	env.fog_density = 0.0011
+	env.fog_aerial_perspective = 0.35
+	env.fog_sky_affect = 0.2
 	env.glow_enabled = true
-	env.glow_intensity = 0.12
-	env.glow_strength = 0.6
-	env.glow_bloom = 0.02
+	env.glow_intensity = 0.06
+	env.glow_strength = 0.5
+	env.glow_bloom = 0.0
+	env.glow_hdr_threshold = 1.4
 	env.glow_blend_mode = Environment.GLOW_BLEND_MODE_SOFTLIGHT
 	env.ssao_enabled = true
-	env.ssao_radius = 1.2
-	env.ssao_intensity = 0.85
-	env.ssao_power = 1.5
-	env.adjustment_enabled = false
+	env.ssao_radius = 1.6
+	env.ssao_intensity = 1.6
+	env.ssao_power = 1.6
+	env.ssao_detail = 0.6
+	env.ssao_light_affect = 0.15
+	env.ssil_enabled = true
+	env.ssil_radius = 4.0
+	env.ssil_intensity = 0.6
+	# Final grade: tiny contrast lift, saturation held at neutral (no filter tint).
+	env.adjustment_enabled = true
+	env.adjustment_brightness = 1.0
+	env.adjustment_contrast = 1.07
+	env.adjustment_saturation = 0.97
 	we.environment = env
 	return we
 
@@ -115,19 +125,23 @@ static func make_battlefield_environment() -> WorldEnvironment:
 static func make_battlefield_sun() -> DirectionalLight3D:
 	var sun := DirectionalLight3D.new()
 	sun.name = "Sun"
-	# Mid-afternoon, warm-white (not orange). Greens retain hue under this light.
-	sun.rotation_degrees = Vector3(-38, -50, 0)
-	sun.light_color = Color(1.0, 0.94, 0.86)
-	sun.light_energy = 1.5
-	sun.light_indirect_energy = 0.85
-	sun.light_specular = 0.7
+	# High late-morning sun, neutral white (bright daytime — not golden hour).
+	sun.rotation_degrees = Vector3(-52, -42, 0)
+	sun.light_color = Color(1.0, 0.98, 0.95)
+	sun.light_energy = 1.4
+	sun.light_indirect_energy = 1.0
+	sun.light_specular = 0.5
+	sun.light_angular_distance = 0.5
 	sun.shadow_enabled = true
-	sun.shadow_blur = 0.9
+	sun.shadow_blur = 0.6
+	sun.shadow_bias = 0.03
+	sun.shadow_normal_bias = 1.2
 	sun.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_4_SPLITS
-	sun.directional_shadow_max_distance = 160.0
-	sun.directional_shadow_split_1 = 0.08
-	sun.directional_shadow_split_2 = 0.22
-	sun.directional_shadow_split_3 = 0.5
+	sun.directional_shadow_max_distance = 180.0
+	sun.directional_shadow_split_1 = 0.06
+	sun.directional_shadow_split_2 = 0.18
+	sun.directional_shadow_split_3 = 0.45
+	sun.directional_shadow_blend_splits = true
 	return sun
 
 

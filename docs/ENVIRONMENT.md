@@ -94,3 +94,48 @@ Drop any “intentionally low-poly” framing. Amplify:
 - Software (xvfb/OpenGL) still understates alpha cards / normals vs a real GPU.
 - Torii enrichment pass may still be thinner than hut/palisade density — further mesh
   detail welcome without changing footprint or combat.
+
+## v5 — KENGEKI courtyard integration + de-plastic materials/lighting (Bot 3)
+
+Layout, terrain heights, spawns (`spawn_0`/`spawn_1`), objectives A/B/C, roads and gameplay are unchanged.
+Source pack preserved; a **copied subset** lives in `assets/environment/courtyard/` (same `Courtyard/` / `Decorations/` structure, 27 GLBs, ~70 MB). No KENGEKI scripts/scenes imported.
+
+### Import check (Godot 4.7.2, `tools/capture/glb_aabb.gd`)
+All GLBs load; node scale = 1, base at y=0, real metres (no unapplied-scale bug):
+yaguramon 15.3×10.4×8.3 · wall_segment_4m 4.0×4.7×1.6 · corner_turret 7.5×10.7×7.5 · barracks_nagaya 24×6×6 ·
+storehouse_kura 8×7×6 · stone_lantern_toro 0.8×2.0×0.9 · rock_medium 1.5×1.0×1.2 · rock_formation_large 2.8×2.0×2.7 ·
+tree_pine_kuromatsu 6.3×7×3.6 · tree_sakura 5.8×6×5.2 · tree_maple_momiji 4×5×4 · shrub_azalea 1.5×1.1×1.5.
+
+### What replaced what
+| Where | Before | v5 |
+|---|---|---|
+| Each camp | thatch hut | `storehouse_kura` (box collider) |
+| Each camp (rear, 24 m behind spawns) | — | honjin enclosure: `main_gate_yaguramon_wide` + 6× `wall_segment_4m` + 2× `corner_turret` + 2 toro lanterns |
+| Each camp outer flank | — | `barracks_nagaya` (long axis N–S, clear of roads) |
+| Objective A farmstead | 2 huts | `storehouse_kura` + 1 hut, toro lantern, momiji + sakura heroes |
+| Objective B shrine | torii, walls | + paired toro lanterns on the approach, azaleas, sakura/momiji outside ring |
+| Objective C outpost | hut | `corner_turret` watch-yagura, kuromatsu hero, lantern |
+| All cover/field rocks | 80-tri Blender rock | KENGEKI PBR rocks (`rock_medium`, `rock_formation_large`/`_b`), same collider |
+Structures with LOD siblings switch to `_lod2` past 70 m (visibility ranges); others cull at 140–320 m. Scatter (pines/shrubs/grass/rocks) avoids new footprints via `_keepouts`.
+Not used: `castle_keep_tenshu`, `main_hall_goten`, bridges (no stream crossing without route risk), pond stones.
+
+### Plastic look fix
+- Grass/foliage textures regraded (hue toward natural sap/olive, saturation ~0.6×, value ~0.75×; grass avg sRGB 43,174,42 → 92,125,68). Pine/leaf/grass cards same.
+- Foliage materials: emission removed, rim 0.4→0.12, roughness ≥0.88, low specular, soft backlight on cards (`_tame_foliage`).
+- Wood/stone/thatch base colours toned to KENGEKI `gb_*` guidance.
+- `terrain_blend.gdshader` rewritten: removed grass saturation boost; height-aware layer transitions; macro lush/dry variation; per-layer normals (grass/dirt/rock) + roughness map; slope cavity AO; dirt desaturated toward umber.
+Faction red/blue banners/curtains untouched.
+
+### Lighting / grade (bright daytime kept)
+Higher neutral-white sun (-52°, 1.4), 4-split shadows to 180 m with blend, crisper blur; colour ambient 0.45 + sky contribution; SSAO stronger (Forward+), SSIL on; glow reduced (0.06, no bloom); filmic white 4.5; adjustment contrast 1.07 / saturation 0.97 (no tint).
+
+### Verification
+- `tools/test.sh`: 73/73 pass (incl. full AI conquest match). Nav rebaked (`tools/bake_navmesh.sh`: 8028 polys).
+- `tools/sim.sh`: 2.30 ms avg CPU/frame (v4 2.19; measured while a capture ran), 0/31 soldiers stuck in camp, all objectives contested.
+- Captures now **Forward+ (Vulkan/llvmpipe)** — the game's real renderer. Earlier opengl3 captures mis-decoded sRGB and over-brightened textures. `docs/env_before_v5/` (tip e6695e1) vs `docs/env_after_v5/`, side-by-sides `docs/env_demo/compare_v5_*.png` (11 angles incl. architecture, grass close-up, gameplay eye height).
+
+### Known issues
+- No gameplay video this pass (software Vulkan ~10 s/frame).
+- SSAO/SSIL only visible on Forward+ GPU; check on Windows.
+- Pine LOD canopies still read a bit faceted at mid distance; C turret is visually heavy at the ring edge (collider outside the 12 m capture radius core).
+- Near grass tufts are sparse; terrain texture carries most of the close-up.
