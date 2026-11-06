@@ -19,6 +19,15 @@ Kengeki and ASHIGARU were only read from; nothing in those repositories was chan
   procedural primitives generated in-engine for this project (Bot 3). No third-party meshes,
   textures, or sound. See [docs/ENVIRONMENT.md](docs/ENVIRONMENT.md).
 
+- **Environment v3/v4 assets** (`assets/env/meshes/*.glb`, `assets/env/textures/*.png`,
+  `assets/env/terrain_blend.gdshader`, `assets/env/foliage_wind.gdshader`,
+  `scripts/battle/env_meshes.gd`): original procedural / Blender-authored content created for
+  this project (Bot 3). No third-party store meshes or photos. Textures are synthetic noise /
+  painted cards; meshes are original primitives arranged into dense Sengoku silhouettes
+  (leaf-card canopies, architecture kits). Stylized-realistic density target — not third-party
+  GoT / Hunyuan assets.
+- **Environment v5** (`assets/environment/courtyard/`): subset copied from Kirk's own KENGEKI courtyard pack (see its CREDITS.md); originals preserved.
+
 ## Combat / VFX overhaul (`bot2/combat-audio`)
 - Soft particle textures in `assets/vfx/`: procedural PNGs (CC0).
 - Voice/SFX replacements: see `audio/LICENSES.md`.

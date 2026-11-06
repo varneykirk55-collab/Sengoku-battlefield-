@@ -3,7 +3,7 @@ extends Node3D
 ## The prototype battlefield, generated deterministically from code (primitives only):
 ## rolling terrain with a central hill and a stream valley, three capture points (A, B, C),
 ## two faction camps, and cover (rocks, palisades, stone walls, huts, a torii, pines,
-## bamboo groves, grass, dirt roads). Bot 3 env overhaul v2 — vibrant greens, neutral-warm light.
+## bamboo, grass, dirt roads). Bot 3 v4 — dense leaf-card canopies (GoT-aim): terrain shader, Blender pine/hut/torii GLBs.
 ##
 ## Layout (top view, -Z is north):
 ##                 north camp (faction 1, blue)        z = -128
@@ -53,6 +53,19 @@ var _foliage_dark: StandardMaterial3D
 var _foliage_mid: StandardMaterial3D
 var _foliage_lit: StandardMaterial3D
 var _grass_mat: StandardMaterial3D
+var _pine_mesh: Mesh
+var _pine_lod_mesh: Mesh
+var _shrub_mesh: Mesh
+var _rock_mesh: Mesh
+var _hut_scene: PackedScene
+var _torii_scene: PackedScene
+var _palisade_mesh: Mesh
+var _grass_clump_mesh: Mesh
+var _rock_meshes: Array[Mesh] = []
+var _rock_norm: Array[float] = []
+var _scene_cache := {}
+var _keepouts: Array[Rect2] = []  # structure footprints (+margin) that scatter must avoid
+const COURTYARD := "res://assets/environment/courtyard/"
 
 
 func _ready() -> void:
@@ -61,15 +74,17 @@ func _ready() -> void:
 	_noise.fractal_octaves = 3
 	_rng.seed = SEED
 	# Distinct per-material palette — saturated greens, oak wood, cool stone (no olive-brown wash).
-	_wood = _wood_mat(Color(0.58, 0.4, 0.22))
-	_dark_wood = _wood_mat(Color(0.22, 0.14, 0.08))
-	_stone = _stone_mat(Color(0.52, 0.54, 0.56))
-	_thatch = _mat(Color(0.74, 0.6, 0.34), 0.9)
-	_bamboo = _foliage_mat(Color(0.4, 0.7, 0.28), 0.55, 0.08)
-	_foliage_dark = _foliage_mat(Color(0.04, 0.28, 0.08), 0.8, 0.0)
-	_foliage_mid = _foliage_mat(Color(0.1, 0.52, 0.14), 0.68, 0.06)
-	_foliage_lit = _foliage_mat(Color(0.3, 0.72, 0.18), 0.52, 0.18)
-	_grass_mat = _foliage_mat(Color(0.28, 0.68, 0.16), 0.72, 0.08)
+	_wood = _wood_mat(Color(0.46, 0.34, 0.22))
+	_dark_wood = _wood_mat(Color(0.2, 0.14, 0.1))
+	_stone = _stone_mat(Color(0.5, 0.5, 0.48))
+	_thatch = _mat(Color(0.6, 0.52, 0.36), 0.95)
+	# v5 de-plastic: natural sap/olive greens, no emission, high roughness (KENGEKI gb_* guidance).
+	_bamboo = _foliage_mat(Color(0.42, 0.52, 0.27), 0.7, 0.0)
+	_foliage_dark = _foliage_mat(Color(0.12, 0.22, 0.1), 0.9, 0.0)
+	_foliage_mid = _foliage_mat(Color(0.2, 0.33, 0.14), 0.88, 0.0)
+	_foliage_lit = _foliage_mat(Color(0.33, 0.43, 0.18), 0.85, 0.0)
+	_grass_mat = _foliage_mat(Color(0.3, 0.45, 0.17), 0.9, 0.0)
+	_load_env_assets()
 	add_child(PrototypeGround.make_battlefield_environment())
 	var sun := PrototypeGround.make_battlefield_sun()
 	add_child(sun)
@@ -82,6 +97,7 @@ func _ready() -> void:
 		_build_camp(f, CAMPS[f])
 	_scatter_cover()
 	_build_trees()
+	_build_shrubs()
 	_build_bamboo()
 	_build_grass()
 	_build_distant_scenery()
@@ -216,61 +232,59 @@ func _build_terrain() -> void:
 
 
 func _ground_color(x: float, z: float, h: float, n: Vector3) -> Color:
-	# Saturated grass greens that stay green under warm-white sun. Dirt/stone only where intended.
+	## Vertex COLOR as blend weights for terrain shader: R=dirt, G=grass, B=rock.
 	var n1 := clampf(_noise.get_noise_2d(x * 3.0, z * 3.0) + 0.5, 0.0, 1.0)
-	var n2 := clampf(_noise.get_noise_2d(x * 8.0 + 40.0, z * 8.0) + 0.5, 0.0, 1.0)
-	var n3 := clampf(_noise.get_noise_2d(x * 1.2 - 80.0, z * 1.2) + 0.5, 0.0, 1.0)
-	# True greens (high G, moderate R, low B) — not olive/mustard.
-	var grass_a := Color(0.1, 0.4, 0.12)
-	var grass_b := Color(0.18, 0.55, 0.18)
-	var grass_c := Color(0.32, 0.68, 0.22)  # bright spring patch
-	var grass := grass_a.lerp(grass_b, n1).lerp(grass_c, n2 * 0.55)
-	# Stronger moss / meadow patch contrast (still green, not brown).
-	grass = grass.lerp(Color(0.06, 0.3, 0.1), clampf(n3 - 0.5, 0.0, 0.45) * 1.6)
-	grass = grass.lerp(Color(0.4, 0.72, 0.28), clampf(n2 - 0.65, 0.0, 0.3) * 1.2)
-	var dirt := Color(0.4, 0.28, 0.16)
-	var soil := Color(0.34, 0.24, 0.14)
-	var rock := Color(0.48, 0.5, 0.52)
 	var slope := 1.0 - n.y
-	var c := grass
-	# Exposed soil only on steeper slopes — keep most of the field green.
-	c = c.lerp(dirt.lerp(soil, n1), clampf(slope * 7.0 - 0.8, 0.0, 0.85))
-	c = c.lerp(rock, clampf(slope * 5.5 - 1.4, 0.0, 1.0))
-	# Slight cooler shade in valleys (more green-blue), no yellow height wash.
-	if h < 1.0:
-		c = c.lerp(Color(0.12, 0.4, 0.2), clampf((1.0 - h) / 4.0, 0.0, 0.2))
-	# Trampled ground around camps and objectives (contained dirt, not map-wide brown).
-	for o in OBJECTIVES:
-		var p: Vector2 = o.pos
-		c = c.lerp(dirt, clampf(1.0 - Vector2(x, z).distance_to(p) / 11.0, 0.0, 0.65))
-	for cp: Vector2 in CAMPS:
-		c = c.lerp(dirt, clampf(1.0 - Vector2(x, z).distance_to(cp) / 16.0, 0.0, 0.45))
-	# Dirt roads — clear paths, strong contrast against green.
+	var grass_w := 1.0
+	var dirt_w := 0.0
+	var rock_w := 0.0
+	# Steep slopes → rock / exposed soil
+	dirt_w += clampf(slope * 6.5 - 0.7, 0.0, 0.9)
+	rock_w += clampf(slope * 5.0 - 1.3, 0.0, 1.0)
+	# Macro meadow variation
+	grass_w += n1 * 0.25
+	# Roads
 	var rw := _road_weight(x, z)
 	if rw > 0.0:
-		c = c.lerp(Color(0.45, 0.32, 0.18), rw * 0.92)
-	# Stream bed — cool wet stone/sand, not brown.
+		dirt_w += rw * 1.4
+		grass_w -= rw * 0.9
+	# Trampled camps / objectives
+	for o in OBJECTIVES:
+		var p: Vector2 = o.pos
+		var tw := clampf(1.0 - Vector2(x, z).distance_to(p) / 11.0, 0.0, 0.7)
+		dirt_w += tw
+		grass_w -= tw * 0.6
+	for cp: Vector2 in CAMPS:
+		var tw2 := clampf(1.0 - Vector2(x, z).distance_to(cp) / 16.0, 0.0, 0.5)
+		dirt_w += tw2
+		grass_w -= tw2 * 0.5
+	# Stream bed → wet rock/dirt
 	var stream_z := -70.0 + 14.0 * sin(x / 32.0)
-	if absf(z - stream_z) < 2.5 and h < 0.0:
-		c = Color(0.3, 0.4, 0.38).lerp(Color(0.38, 0.48, 0.46), n1)
-	return c
+	if absf(z - stream_z) < 2.8 and h < 0.5:
+		rock_w += 0.7
+		dirt_w += 0.5
+		grass_w -= 0.8
+	grass_w = maxf(grass_w, 0.05)
+	dirt_w = maxf(dirt_w, 0.0)
+	rock_w = maxf(rock_w, 0.0)
+	var s := grass_w + dirt_w + rock_w
+	return Color(dirt_w / s, grass_w / s, rock_w / s)
 
 
-func _terrain_material() -> StandardMaterial3D:
-	var m := StandardMaterial3D.new()
-	m.vertex_color_use_as_albedo = true
-	# Subtle green-tinted micro-variation (CPU ImageTexture — headless-safe).
-	m.albedo_texture = _cpu_noise_albedo(
-		SEED + 3, 0.045, 256,
-		[Color(0.58, 0.8, 0.5), Color(0.96, 1.0, 0.94), Color(0.72, 0.94, 0.64)])
-	m.normal_enabled = true
-	m.normal_texture = _cpu_noise_normal(SEED + 9, 0.11, 256, 6.5)
-	m.normal_scale = 0.95
-	m.roughness = 0.86
-	m.roughness_texture = _cpu_noise_albedo(
-		SEED + 13, 0.12, 128,
-		[Color(0.55, 0.55, 0.55), Color(0.85, 0.85, 0.85), Color(1.0, 1.0, 1.0)])
-	m.roughness_texture_channel = BaseMaterial3D.TEXTURE_CHANNEL_RED
+func _terrain_material() -> ShaderMaterial:
+	var m := ShaderMaterial.new()
+	m.shader = load("res://assets/env/terrain_blend.gdshader")
+	m.set_shader_parameter("grass_albedo", load("res://assets/env/textures/grass_albedo.png"))
+	m.set_shader_parameter("dirt_albedo", load("res://assets/env/textures/dirt_albedo.png"))
+	m.set_shader_parameter("rock_albedo", load("res://assets/env/textures/rock_albedo.png"))
+	m.set_shader_parameter("grass_normal", load("res://assets/env/textures/grass_normal.png"))
+	m.set_shader_parameter("dirt_normal", load("res://assets/env/textures/dirt_normal.png"))
+	m.set_shader_parameter("rock_normal", load("res://assets/env/textures/rock_normal.png"))
+	m.set_shader_parameter("grass_rough", load("res://assets/env/textures/grass_rough.png"))
+	m.set_shader_parameter("grass_scale", 0.12)
+	m.set_shader_parameter("dirt_scale", 0.15)
+	m.set_shader_parameter("rock_scale", 0.1)
+	m.set_shader_parameter("normal_strength", 0.9)
 	return m
 
 
@@ -326,8 +340,11 @@ func _build_objective(id: StringName, p: Vector2) -> void:
 	cp.position = ground_point(p.x, p.y)
 	objectives.append(cp)
 	match id:
-		&"A":  # farmstead: two huts and a fence
-			_hut(Vector3(p.x - 9, 0, p.y - 6), 0.2)
+		&"A":  # farmstead: kura storehouse + hut, fence, lanterns
+			_prop("Courtyard/storehouse_kura/storehouse_kura", Vector2(p.x - 9, p.y - 6), 0.2 + PI / 2, Vector3(7.6, 6.0, 5.6), true)
+			_prop("Decorations/stone_lantern_toro/stone_lantern_toro_lod8k", Vector2(p.x - 4.5, p.y - 9.5), 0.2, Vector3(0.7, 2.0, 0.7), false)
+			_hero_tree("Courtyard/tree_maple_momiji/tree_maple_momiji_lod3k", Vector2(p.x - 16, p.y - 2), 0.6, 1.25)
+			_hero_tree("Courtyard/tree_sakura/tree_sakura_lod3k", Vector2(p.x + 15, p.y + 13), 2.1, 1.1)
 			_hut(Vector3(p.x + 8, 0, p.y + 7), -0.4)
 			_palisade(Vector2(p.x - 14, p.y + 8), Vector2(p.x - 4, p.y + 15))
 			_stone_wall(Vector2(p.x + 6, p.y - 12), Vector2(p.x + 15, p.y - 4))
@@ -338,8 +355,17 @@ func _build_objective(id: StringName, p: Vector2) -> void:
 			_stone_wall(Vector2(p.x + 4, p.y + 10), Vector2(p.x + 11, p.y + 5))
 			_rock(Vector3(p.x + 9, 0, p.y - 4), 1.4)
 			_rock(Vector3(p.x - 8, 0, p.y - 2), 0.9)
-		&"C":  # river crossing outpost: hut, palisade, rocks
-			_hut(Vector3(p.x + 9, 0, p.y + 5), 1.3)
+			# Shrine approach: paired toro lanterns + flanking momiji/sakura (outside capture ring).
+			_prop("Decorations/stone_lantern_toro/stone_lantern_toro_lod8k", Vector2(p.x - 3.2, p.y - 10.5), 0.0, Vector3(0.7, 2.0, 0.7), false)
+			_prop("Decorations/stone_lantern_toro/stone_lantern_toro_lod8k", Vector2(p.x + 3.2, p.y - 10.5), 0.0, Vector3(0.7, 2.0, 0.7), false)
+			_hero_tree("Courtyard/tree_sakura/tree_sakura_lod3k", Vector2(p.x - 13, p.y - 11), 0.4, 1.15)
+			_hero_tree("Courtyard/tree_maple_momiji/tree_maple_momiji_lod3k", Vector2(p.x + 13, p.y - 12), 1.7, 1.3)
+			_prop("Courtyard/shrub_azalea/shrub_azalea", Vector2(p.x - 6, p.y - 12), 0.0, Vector3.ZERO, false)
+			_prop("Courtyard/shrub_azalea/shrub_azalea_b", Vector2(p.x + 6, p.y - 12.5), 1.0, Vector3.ZERO, false)
+		&"C":  # river crossing outpost: yagura watch turret, palisade, rocks
+			_prop("Courtyard/corner_turret/corner_turret", Vector2(p.x + 10, p.y + 6), 1.3, Vector3(7.0, 10.0, 7.0), true)
+			_hero_tree("Courtyard/tree_pine_kuromatsu/tree_pine_kuromatsu_lod3k", Vector2(p.x - 15, p.y + 1), 0.9, 1.2)
+			_prop("Decorations/stone_lantern_toro/stone_lantern_toro_lod8k", Vector2(p.x + 4, p.y + 11), 1.3, Vector3(0.7, 2.0, 0.7), false)
 			_palisade(Vector2(p.x - 13, p.y - 10), Vector2(p.x - 3, p.y - 15))
 			_palisade(Vector2(p.x - 14, p.y + 4), Vector2(p.x - 9, p.y + 13))
 			_rock(Vector3(p.x - 4, 0, p.y + 9), 1.2)
@@ -377,7 +403,29 @@ func _build_camp(faction: int, c: Vector2) -> void:
 	# Extra camp detail: side palisade wings + a small hut (behind spawns, not blocking).
 	_palisade(Vector2(c.x - 24, c.y + away * 2.0), Vector2(c.x - 18, c.y + away * 14.0))
 	_palisade(Vector2(c.x + 24, c.y + away * 2.0), Vector2(c.x + 18, c.y + away * 14.0))
-	_hut(Vector3(c.x - 18, 0, c.y + away * 8.0), facing + 0.3)
+	_prop("Courtyard/storehouse_kura/storehouse_kura", Vector2(c.x - 18, c.y + away * 8.0), facing + 0.3, Vector3(7.6, 6.0, 5.6), true)
+	# Rear honjin enclosure: yaguramon gate, ishigaki wall runs and corner yagura (behind spawns; routes forward untouched).
+	var rz := c.y + away * 24.0
+	_keepouts.append(Rect2(c.x - 33.0, minf(rz - 6.0, rz + 6.0), 66.0, 12.0))
+	_keepouts.append(Rect2(c.x - away * 36.0 - 6.0, c.y + away * 8.0 - 16.0, 12.0, 32.0))
+	_prop("Courtyard/main_gate_yaguramon/main_gate_yaguramon_wide", Vector2(c.x, rz), facing, Vector3.ZERO, false)
+	for gx in [-5.6, 5.6]:  # gate side posts collide; centre opening stays clear
+		var gb := StaticBody3D.new()
+		gb.collision_layer = Soldier.LAYER_WORLD
+		add_child(gb)
+		gb.position = ground_point(c.x + gx, rz) + Vector3(0, 2.5, 0)
+		var gcs := CollisionShape3D.new()
+		var gsh := BoxShape3D.new()
+		gsh.size = Vector3(4.0, 5.0, 4.0)
+		gcs.shape = gsh
+		gb.add_child(gcs)
+	for side in [-1.0, 1.0]:
+		for k in 3:
+			_prop("Courtyard/wall_segment_4m/wall_segment_4m", Vector2(c.x + side * (9.7 + k * 4.0), rz), facing, Vector3(4.0, 4.0, 1.4), true)
+		_prop("Courtyard/corner_turret/corner_turret", Vector2(c.x + side * 25.5, rz), facing, Vector3(7.0, 10.0, 7.0), true)
+		_prop("Decorations/stone_lantern_toro/stone_lantern_toro_lod8k", Vector2(c.x + side * 4.2, rz - away * 5.5), facing, Vector3(0.7, 2.0, 0.7), false)
+	# Nagaya barracks on the outer flank, long axis along z (clear of roads and spawns).
+	_prop("Courtyard/barracks_nagaya/barracks_nagaya", Vector2(c.x - away * 36.0, c.y + away * 8.0), PI / 2, Vector3(23.6, 5.6, 5.6), true)
 	_box(ground_point(c.x + 10, c.y + away * 9.0) + Vector3(0, 0.45, 0), Vector3(1.0, 0.9, 1.0), _wood, true)
 	# Extra flanking nobori for stronger faction color presence.
 	_nobori(ground_point(c.x - 22, c.y + away * 6.0), color)
@@ -427,6 +475,9 @@ func _scatter_cover() -> void:
 
 
 func _too_close_to_points(p: Vector2, r: float) -> bool:
+	for k in _keepouts:
+		if k.has_point(p):
+			return true
 	for o in OBJECTIVES:
 		if p.distance_to(o.pos) < r:
 			return true
@@ -437,63 +488,87 @@ func _too_close_to_points(p: Vector2, r: float) -> bool:
 
 
 func _build_trees() -> void:
-	# Pines on the flanks and berms (MultiMesh for the foliage, a collider per trunk).
-	var trunk_mesh := CylinderMesh.new()
-	trunk_mesh.top_radius = 0.18
-	trunk_mesh.bottom_radius = 0.28
-	trunk_mesh.height = 6.0
-	trunk_mesh.radial_segments = 6
-	var crown := CylinderMesh.new()
-	crown.top_radius = 0.0
-	crown.bottom_radius = 2.4
-	crown.height = 5.5
-	crown.radial_segments = 7
-	var spots: Array[Vector3] = []
-	for i in 180:
+	# Dense stylized-realistic Japanese pine GLBs (leaf-card + solid canopy plates).
+	var mesh := _pine_mesh if _pine_mesh else EnvMeshes.japanese_pine()
+	var lod := _pine_lod_mesh if _pine_lod_mesh else EnvMeshes.japanese_pine_lod()
+	var near_spots: Array[Vector3] = []
+	var far_spots: Array[Vector3] = []
+	# Hero (dense leaf-card) pines near playable lanes; LOD forest mass on berms/flanks.
+	for i in 480:
 		var side := _rng.randi() % 4
 		var x := _rng.randf_range(-HALF_X + 6, HALF_X - 6)
 		var z := _rng.randf_range(-HALF_Z + 6, HALF_Z - 6)
 		match side:
-			0: x = _rng.randf_range(-HALF_X + 6, -HALF_X + 48)
-			1: x = _rng.randf_range(HALF_X - 48, HALF_X - 6)
-			2: z = _rng.randf_range(-HALF_Z + 6, -HALF_Z + 28)
-			3: z = _rng.randf_range(HALF_Z - 28, HALF_Z - 6)
+			0: x = _rng.randf_range(-HALF_X + 6, -HALF_X + 55)
+			1: x = _rng.randf_range(HALF_X - 55, HALF_X - 6)
+			2: z = _rng.randf_range(-HALF_Z + 6, -HALF_Z + 32)
+			3: z = _rng.randf_range(HALF_Z - 32, HALF_Z - 6)
 		var p := Vector2(x, z)
-		if _too_close_to_points(p, 18.0) or _road_weight(x, z) > 0.45:
+		if _too_close_to_points(p, 16.0) or _road_weight(x, z) > 0.45:
 			continue
-		spots.append(ground_point(x, z))
-	# Grove east of the hill for mid-field cover.
-	for i in 18:
-		var p := Vector2(_rng.randf_range(22, 42), _rng.randf_range(-16, 16))
-		if _road_weight(p.x, p.y) < 0.4:
-			spots.append(ground_point(p.x, p.y))
-	# West grove near A flank.
-	for i in 12:
-		var p := Vector2(_rng.randf_range(-95, -70), _rng.randf_range(20, 55))
+		far_spots.append(ground_point(x, z))
+	# Midfield + west hero groves (dense leaf-card canopies)
+	for i in 72:
+		var p := Vector2(_rng.randf_range(18, 52), _rng.randf_range(-20, 20))
+		if _road_weight(p.x, p.y) < 0.4 and not _too_close_to_points(p, 14.0):
+			near_spots.append(ground_point(p.x, p.y))
+	for i in 56:
+		var p := Vector2(_rng.randf_range(-105, -65), _rng.randf_range(15, 62))
+		if not _too_close_to_points(p, 14.0):
+			near_spots.append(ground_point(p.x, p.y))
+	for i in 44:
+		var p := Vector2(_rng.randf_range(-45, 45), _rng.randf_range(-115, -80))
 		if not _too_close_to_points(p, 16.0):
-			spots.append(ground_point(p.x, p.y))
-	var trunks := _multimesh(trunk_mesh, _dark_wood, spots, Vector3(0, 3.0, 0))
-	trunks.name = "Trunks"
-	var crowns1 := _multimesh(crown, _foliage_dark, spots, Vector3(0, 5.2, 0))
-	crowns1.name = "Crowns"
-	var crowns2 := _multimesh(crown, _foliage_mid, spots, Vector3(0, 7.6, 0), 0.7)
-	crowns2.name = "CrownsTop"
-	# Lit tips for golden-hour catch-light.
-	var crowns3 := _multimesh(crown, _foliage_lit, spots, Vector3(0, 8.8, 0), 0.45)
-	crowns3.name = "CrownsLit"
+			near_spots.append(ground_point(p.x, p.y))
+	# Cap hero instances for GPU budget; LOD forest carries silhouette mass
+	while near_spots.size() > 110:
+		near_spots.remove_at(near_spots.size() - 1)
+	var pines := _multimesh(mesh, null, near_spots, Vector3.ZERO, 1.0)
+	pines.name = "Pines"
+	var pines_lod := _multimesh(lod, null, far_spots, Vector3.ZERO, 1.05)
+	pines_lod.name = "PinesLOD"
+	# Trunk colliders (near + far)
 	var body := StaticBody3D.new()
 	body.name = "TreeTrunks"
 	body.collision_layer = Soldier.LAYER_WORLD
 	body.add_to_group("wood")
 	add_child(body)
-	for s in spots:
+	for s in near_spots + far_spots:
 		var cs := CollisionShape3D.new()
 		var cyl := CylinderShape3D.new()
-		cyl.radius = 0.3
-		cyl.height = 6.0
+		cyl.radius = 0.35
+		cyl.height = 6.5
 		cs.shape = cyl
-		cs.position = s + Vector3(0, 3.0, 0)
+		cs.position = s + Vector3(0, 3.2, 0)
 		body.add_child(cs)
+
+
+
+func _build_shrubs() -> void:
+	var mesh := _shrub_mesh if _shrub_mesh else EnvMeshes.shrub()
+	var spots: Array[Vector3] = []
+	for i in 620:
+		var x := _rng.randf_range(-HALF_X + 18, HALF_X - 18)
+		var z := _rng.randf_range(-HALF_Z + 22, HALF_Z - 22)
+		var p := Vector2(x, z)
+		if _too_close_to_points(p, 14.0) or _road_weight(x, z) > 0.4:
+			continue
+		if _rng.randf() > 0.28:
+			continue
+		spots.append(ground_point(x, z))
+	# Clusters near stream banks and grove edges
+	for i in 180:
+		var x := _rng.randf_range(-110, 60)
+		var stream_z := -70.0 + 14.0 * sin(x / 32.0)
+		var z := stream_z + _rng.randf_range(4.0, 10.0) * (1.0 if i % 2 == 0 else -1.0)
+		var p := Vector2(x, z)
+		if not _too_close_to_points(p, 14.0):
+			spots.append(ground_point(x, z))
+	if spots.is_empty():
+		return
+	var shrubs := _multimesh(mesh, null, spots, Vector3.ZERO, 1.0)
+	shrubs.name = "Shrubs"
+	shrubs.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
 
 
 func _build_bamboo() -> void:
@@ -541,47 +616,51 @@ func _build_bamboo() -> void:
 
 
 func _build_grass() -> void:
-	# Crossed quad clumps — reads as grass patches from distance, not neon sticks.
-	var quad := QuadMesh.new()
-	quad.size = Vector2(0.9, 0.85)
+	var mesh := _grass_clump_mesh if _grass_clump_mesh else EnvMeshes.grass_tuft()
+	var wind := ShaderMaterial.new()
+	wind.shader = load("res://assets/env/foliage_wind.gdshader")
+	if ResourceLoader.exists("res://assets/env/textures/grass_blade.png"):
+		wind.set_shader_parameter("albedo_tex", load("res://assets/env/textures/grass_blade.png"))
+	wind.set_shader_parameter("wind_strength", 0.2)
+	wind.set_shader_parameter("wind_speed", 1.7)
+	wind.set_shader_parameter("albedo_tint", Color(0.95, 0.95, 0.88, 1.0))
 	var spots: Array[Vector3] = []
-	for i in 640:
-		var x := _rng.randf_range(-HALF_X + 20, HALF_X - 20)
-		var z := _rng.randf_range(-HALF_Z + 25, HALF_Z - 25)
+	for i in 3800:
+		var x := _rng.randf_range(-HALF_X + 16, HALF_X - 16)
+		var z := _rng.randf_range(-HALF_Z + 20, HALF_Z - 20)
 		var p := Vector2(x, z)
-		if _too_close_to_points(p, 12.0) or _road_weight(x, z) > 0.35:
+		if _too_close_to_points(p, 10.0) or _road_weight(x, z) > 0.3:
 			continue
 		var stream_z := -70.0 + 14.0 * sin(x / 32.0)
-		if absf(z - stream_z) < 4.0:
+		if absf(z - stream_z) < 3.0:
 			continue
-		spots.append(ground_point(x, z) + Vector3(0, 0.35, 0))
+		var dens := clampf(_noise.get_noise_2d(x * 0.07, z * 0.07) + 0.6, 0.0, 1.0)
+		if dens < 0.14:
+			continue
+		spots.append(ground_point(x, z) + Vector3(0, 0.02, 0))
 	if spots.is_empty():
 		return
-	var mat_a := _foliage_mat(Color(0.22, 0.6, 0.14), 0.7, 0.06)
-	mat_a.cull_mode = BaseMaterial3D.CULL_DISABLED
-	var mat_b := _foliage_mat(Color(0.34, 0.7, 0.18), 0.65, 0.1)
-	mat_b.cull_mode = BaseMaterial3D.CULL_DISABLED
-	var g1 := _multimesh(quad, mat_a, spots, Vector3.ZERO, 1.0)
-	g1.name = "GrassClumpsA"
-	g1.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	# Second set rotated ~90° via yaw in _multimesh hash — offset spots slightly for cross.
-	var spots2: Array[Vector3] = []
-	for s in spots:
-		spots2.append(s + Vector3(0.05, 0.0, 0.05))
-	var g2 := _multimesh(quad, mat_b, spots2, Vector3.ZERO, 0.95)
-	g2.name = "GrassClumpsB"
-	g2.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	# Use mesh materials when GLB cards present; wind override only for procedural fallback
+	var mat: Material = null if _grass_clump_mesh else wind
+	var grass := _multimesh(mesh, mat, spots, Vector3.ZERO, 1.0)
+	grass.name = "GrassTufts"
+	grass.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	# Second pass with wind material on a subset for motion (keeps most of GLB look)
+	if _grass_clump_mesh and spots.size() > 80:
+		var wind_spots: Array[Vector3] = []
+		for i in range(0, spots.size(), 3):
+			wind_spots.append(spots[i])
+		var grassy := _multimesh(EnvMeshes.grass_tuft(), wind, wind_spots, Vector3(0, 0.05, 0), 1.1)
+		grassy.name = "GrassWind"
+		grassy.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+
 
 
 func _build_distant_scenery() -> void:
 	# Extra berm silhouettes / distant pine hints outside the playable berm (visual only).
-	var crown := CylinderMesh.new()
-	crown.top_radius = 0.0
-	crown.bottom_radius = 3.5
-	crown.height = 8.0
-	crown.radial_segments = 6
+	var mesh := _pine_lod_mesh if _pine_lod_mesh else EnvMeshes.japanese_pine_lod()
 	var spots: Array[Vector3] = []
-	for i in 40:
+	for i in 72:
 		var ang := _rng.randf() * TAU
 		var radius := maxf(HALF_X, HALF_Z) + _rng.randf_range(8.0, 28.0)
 		var x := cos(ang) * radius * (HALF_X / maxf(HALF_X, HALF_Z))
@@ -591,10 +670,10 @@ func _build_distant_scenery() -> void:
 		z = clampf(z, -HALF_Z - 30.0, HALF_Z + 30.0)
 		if absf(x) < HALF_X - 5.0 and absf(z) < HALF_Z - 5.0:
 			continue
-		spots.append(Vector3(x, height_at(clampf(x, -HALF_X + 1, HALF_X - 1), clampf(z, -HALF_Z + 1, HALF_Z - 1)) + 2.0, z))
+		spots.append(Vector3(x, height_at(clampf(x, -HALF_X + 1, HALF_X - 1), clampf(z, -HALF_Z + 1, HALF_Z - 1)), z))
 	if spots.is_empty():
 		return
-	var distant := _multimesh(crown, _foliage_dark, spots, Vector3(0, 4.0, 0), 1.2)
+	var distant := _multimesh(mesh, null, spots, Vector3.ZERO, 1.05)
 	distant.name = "DistantPines"
 	distant.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 
@@ -605,13 +684,14 @@ func _multimesh(mesh: Mesh, mat: Material, spots: Array[Vector3], offset: Vector
 	mm.mesh = mesh
 	mm.instance_count = spots.size()
 	for i in spots.size():
-		var s := scale * (0.85 + 0.3 * fposmod(spots[i].x * 0.37 + spots[i].z * 0.11, 1.0))
+		var s := scale * (0.8 + 0.4 * fposmod(spots[i].x * 0.37 + spots[i].z * 0.11, 1.0))
 		var yaw := fposmod(spots[i].x * 1.7 + spots[i].z * 0.9, TAU)
-		var basis := Basis(Vector3.UP, yaw).scaled(Vector3.ONE * s)
+		var basis := Basis(Vector3.UP, yaw).scaled(Vector3(s, s * (0.92 + 0.16 * fposmod(spots[i].z * 0.23, 1.0)), s))
 		mm.set_instance_transform(i, Transform3D(basis, spots[i] + offset * s))
 	var mmi := MultiMeshInstance3D.new()
 	mmi.multimesh = mm
-	mmi.material_override = mat
+	if mat != null:
+		mmi.material_override = mat
 	add_child(mmi)
 	return mmi
 
@@ -619,19 +699,63 @@ func _multimesh(mesh: Mesh, mat: Material, spots: Array[Vector3], offset: Vector
 # ----------------------------------------------------------------------------- prop builders
 func _rock(p: Vector3, size: float) -> void:
 	var base := ground_point(p.x, p.z)
+	if not _rock_meshes.is_empty():
+		var body := StaticBody3D.new()
+		body.collision_layer = Soldier.LAYER_WORLD
+		add_child(body)
+		body.position = base
+		body.rotation = Vector3(_rng.randf_range(-0.15, 0.15), _rng.randf_range(0, TAU), _rng.randf_range(-0.15, 0.15))
+		body.scale = Vector3.ONE * size * _rng.randf_range(0.9, 1.4)
+		var mi := MeshInstance3D.new()
+		var ri := _rng.randi() % _rock_meshes.size()
+		mi.mesh = _rock_meshes[ri]
+		mi.scale = Vector3.ONE * _rock_norm[ri]
+		mi.position.y = -0.12
+		mi.visibility_range_end = 260.0
+		body.add_child(mi)
+		var cs := CollisionShape3D.new()
+		var shape := SphereShape3D.new()
+		shape.radius = 0.85
+		cs.shape = shape
+		cs.position.y = 0.35
+		body.add_child(cs)
+		return
 	var dims := Vector3(size * _rng.randf_range(1.2, 2.0), size * _rng.randf_range(0.8, 1.4), size * _rng.randf_range(1.0, 1.8))
 	var b := _box(base + Vector3(0, dims.y * 0.4, 0), dims, _stone, false)
 	b.rotation = Vector3(_rng.randf_range(-0.2, 0.2), _rng.randf_range(0, TAU), _rng.randf_range(-0.2, 0.2))
 
 
 func _palisade(a: Vector2, b: Vector2) -> void:
-	# A row of sharpened stakes (one box per 1.2 m so it follows the ground).
-	var n := maxi(2, ceili(a.distance_to(b) / 1.2))
-	for i in n:
-		var p := a.lerp(b, (i + 0.5) / n)
+	# Prefer Blender palisade kit modules (~4 m); fall back to stake boxes.
+	var yaw := -atan2(b.y - a.y, b.x - a.x)
+	if _palisade_mesh:
+		var dist := a.distance_to(b)
+		var n := maxi(1, ceili(dist / 4.0))
+		for i in n:
+			var p := a.lerp(b, (i + 0.5) / n)
+			var base := ground_point(p.x, p.y)
+			var body := StaticBody3D.new()
+			body.collision_layer = Soldier.LAYER_WORLD
+			body.add_to_group("wood")
+			add_child(body)
+			body.position = base + Vector3(0, 0.05, 0)
+			body.rotation.y = yaw
+			var mi := MeshInstance3D.new()
+			mi.mesh = _palisade_mesh
+			body.add_child(mi)
+			var cs := CollisionShape3D.new()
+			var shape := BoxShape3D.new()
+			shape.size = Vector3(4.0, 2.2, 0.45)
+			cs.shape = shape
+			cs.position.y = 1.1
+			body.add_child(cs)
+		return
+	var n2 := maxi(2, ceili(a.distance_to(b) / 1.2))
+	for i in n2:
+		var p := a.lerp(b, (i + 0.5) / n2)
 		var base := ground_point(p.x, p.y)
 		var stake := _box(base + Vector3(0, 1.0, 0), Vector3(1.25, 2.0, 0.28), _wood, true)
-		stake.rotation.y = -atan2(b.y - a.y, b.x - a.x)
+		stake.rotation.y = yaw
 
 
 func _stone_wall(a: Vector2, b: Vector2) -> void:
@@ -645,6 +769,23 @@ func _stone_wall(a: Vector2, b: Vector2) -> void:
 
 func _hut(p: Vector3, yaw: float) -> void:
 	var base := ground_point(p.x, p.z)
+	if _hut_scene:
+		var inst: Node3D = _hut_scene.instantiate()
+		add_child(inst)
+		inst.position = base
+		inst.rotation.y = yaw
+		# Approximate collision box for the hut footprint
+		var body := StaticBody3D.new()
+		body.collision_layer = Soldier.LAYER_WORLD
+		body.add_to_group("wood")
+		inst.add_child(body)
+		var cs := CollisionShape3D.new()
+		var shape := BoxShape3D.new()
+		shape.size = Vector3(6.2, 3.2, 5.0)
+		cs.shape = shape
+		cs.position.y = 1.6
+		body.add_child(cs)
+		return
 	var root := Node3D.new()
 	add_child(root)
 	root.position = base
@@ -664,6 +805,23 @@ func _hut(p: Vector3, yaw: float) -> void:
 
 func _torii(p: Vector3) -> void:
 	var base := ground_point(p.x, p.z)
+	if _torii_scene:
+		var inst: Node3D = _torii_scene.instantiate()
+		add_child(inst)
+		inst.position = base
+		var body := StaticBody3D.new()
+		body.collision_layer = Soldier.LAYER_WORLD
+		body.add_to_group("wood")
+		inst.add_child(body)
+		for x in [-1.9, 1.9]:
+			var cs := CollisionShape3D.new()
+			var cyl := CylinderShape3D.new()
+			cyl.radius = 0.25
+			cyl.height = 4.6
+			cs.shape = cyl
+			cs.position = Vector3(x, 2.3, 0)
+			body.add_child(cs)
+		return
 	var red := _mat(Color(0.88, 0.1, 0.06), 0.55)
 	for x in [-1.9, 1.9]:
 		_box(base + Vector3(x, 2.2, 0), Vector3(0.38, 4.4, 0.38), red, true)
@@ -720,6 +878,167 @@ func _box(pos: Vector3, size: Vector3, mat: Material, wood: bool) -> StaticBody3
 	return body
 
 
+
+func _load_env_assets() -> void:
+	_pine_mesh = _mesh_from_glb("res://assets/env/meshes/pine.glb")
+	_pine_lod_mesh = _mesh_from_glb("res://assets/env/meshes/pine_lod.glb")
+	_shrub_mesh = _mesh_from_glb("res://assets/env/meshes/shrub.glb")
+	_rock_mesh = _mesh_from_glb("res://assets/env/meshes/rock.glb")
+	_palisade_mesh = _mesh_from_glb("res://assets/env/meshes/palisade.glb")
+	_grass_clump_mesh = _mesh_from_glb("res://assets/env/meshes/grass_clump.glb")
+	# KENGEKI courtyard PBR rocks (metre-scale) normalised to the old rock.glb ~2.1 m footprint.
+	for r in [["rock_medium/rock_medium", 1.45], ["rock_formation_large/rock_formation_large", 0.8], ["rock_formation_large/rock_formation_large_b", 0.72]]:
+		var m := _mesh_from_glb(COURTYARD + "Courtyard/" + r[0] + ".glb")
+		if m:
+			_rock_meshes.append(m)
+			_rock_norm.append(r[1])
+	if _rock_meshes.is_empty() and _rock_mesh:
+		_rock_meshes.append(_rock_mesh)
+		_rock_norm.append(1.0)
+	_tame_foliage(_pine_mesh)
+	_tame_foliage(_pine_lod_mesh)
+	_tame_foliage(_shrub_mesh)
+	_tame_foliage(_grass_clump_mesh)
+	if ResourceLoader.exists("res://assets/env/meshes/hut.glb"):
+		_hut_scene = load("res://assets/env/meshes/hut.glb")
+	if ResourceLoader.exists("res://assets/env/meshes/torii.glb"):
+		_torii_scene = load("res://assets/env/meshes/torii.glb")
+
+
+## Instance a KENGEKI courtyard GLB (keeps its PBR materials). `rel` has no extension.
+## Uses the _lod2/_lod1 sibling (if any) past 70 m via visibility ranges.
+func _prop(rel: String, p: Vector2, yaw: float, col: Vector3, wood: bool) -> Node3D:
+	var root := Node3D.new()
+	root.name = rel.get_file().to_pascal_case()
+	add_child(root)
+	root.position = ground_point(p.x, p.y) + Vector3(0, -0.08, 0)
+	root.rotation.y = yaw
+	var full := _courtyard_scene(rel)
+	if full == null:
+		return root
+	var lod: PackedScene = null
+	for suffix in ["_lod2", "_lod1"]:
+		lod = _courtyard_scene(rel + suffix)
+		if lod:
+			break
+	var a: Node3D = full.instantiate()
+	root.add_child(a)
+	if lod:
+		_set_vis_range(a, 0.0, 70.0)
+		var b: Node3D = lod.instantiate()
+		root.add_child(b)
+		_set_vis_range(b, 70.0, 0.0)
+	else:
+		_set_vis_range(a, 0.0, 320.0 if col.y > 3.0 else 140.0)
+	if col != Vector3.ZERO:
+		var body := StaticBody3D.new()
+		body.collision_layer = Soldier.LAYER_WORLD
+		body.collision_mask = 0
+		if wood:
+			body.add_to_group("wood")
+		root.add_child(body)
+		var cs := CollisionShape3D.new()
+		var shape := BoxShape3D.new()
+		shape.size = col
+		cs.shape = shape
+		cs.position.y = col.y * 0.5
+		body.add_child(cs)
+	return root
+
+
+## Hero tree from the courtyard pack, with a single trunk collider.
+func _hero_tree(rel: String, p: Vector2, yaw: float, sc: float) -> void:
+	var t := _prop(rel, p, yaw, Vector3.ZERO, false)
+	t.scale = Vector3.ONE * sc
+	var body := StaticBody3D.new()
+	body.collision_layer = Soldier.LAYER_WORLD
+	body.add_to_group("wood")
+	t.add_child(body)
+	var cs := CollisionShape3D.new()
+	var cyl := CylinderShape3D.new()
+	cyl.radius = 0.3
+	cyl.height = 3.0
+	cs.shape = cyl
+	cs.position.y = 1.5
+	body.add_child(cs)
+
+
+func _courtyard_scene(rel: String) -> PackedScene:
+	if _scene_cache.has(rel):
+		return _scene_cache[rel]
+	var path := COURTYARD + rel + ".glb"
+	var ps: PackedScene = load(path) if ResourceLoader.exists(path) else null
+	_scene_cache[rel] = ps
+	return ps
+
+
+func _set_vis_range(n: Node, begin: float, end: float) -> void:
+	for c in n.find_children("*", "GeometryInstance3D", true, false):
+		var g := c as GeometryInstance3D
+		g.visibility_range_begin = begin
+		g.visibility_range_end = end
+		g.visibility_range_begin_margin = 4.0 if begin > 0.0 else 0.0
+		g.visibility_range_end_margin = 4.0 if end > 0.0 else 0.0
+		g.visibility_range_fade_mode = GeometryInstance3D.VISIBILITY_RANGE_FADE_DISABLED
+
+
+## De-plastic pass for Blender foliage GLB materials: pull saturation/value toward a
+## natural sap/olive green, kill emission, raise roughness, add soft backlight + AO-like darkening.
+func _tame_foliage(mesh: Mesh) -> void:
+	if mesh == null:
+		return
+	for i in mesh.get_surface_count():
+		var m := mesh.surface_get_material(i) as StandardMaterial3D
+		if m == null:
+			continue
+		m = m.duplicate()
+		var c := m.albedo_color
+		var leafy := c.g > c.r * 1.15 and c.g > c.b * 1.15
+		if leafy or m.albedo_texture != null:
+			var h := c.h
+			var sat := c.s
+			var val := c.v
+			if leafy:
+				h = lerpf(h, 0.24, 0.35)  # nudge pure green toward yellow-olive
+				sat = minf(sat * 0.8, 0.62)
+				val = clampf(val * 0.8, 0.12, 0.6)
+			else:  # textured card (texture already regraded on disk): near-neutral tint
+				c = Color(0.86, 0.86, 0.8)
+				h = c.h
+				sat = c.s
+				val = c.v
+			m.albedo_color = Color.from_hsv(h, sat, val, c.a)
+			m.emission_enabled = false
+			m.rim_enabled = false
+			m.roughness = maxf(m.roughness, 0.88)
+			m.metallic = 0.0
+			m.metallic_specular = 0.25
+			if m.transparency != BaseMaterial3D.TRANSPARENCY_DISABLED or m.alpha_scissor_threshold > 0.0:
+				m.backlight_enabled = true
+				m.backlight = Color(0.16, 0.2, 0.08)
+		else:
+			m.roughness = maxf(m.roughness, 0.85)
+			m.metallic_specular = 0.3
+		mesh.surface_set_material(i, m)
+
+
+func _mesh_from_glb(path: String) -> Mesh:
+	if not ResourceLoader.exists(path):
+		return null
+	var ps: PackedScene = load(path)
+	if ps == null:
+		return null
+	var root := ps.instantiate()
+	var found: Mesh = null
+	for c in root.find_children("*", "MeshInstance3D", true, false):
+		var mi := c as MeshInstance3D
+		if mi.mesh:
+			found = mi.mesh
+			break
+	root.queue_free()
+	return found
+
+
 func _mat(c: Color, roughness: float = 0.9) -> StandardMaterial3D:
 	var m := StandardMaterial3D.new()
 	m.albedo_color = c
@@ -730,8 +1049,9 @@ func _mat(c: Color, roughness: float = 0.9) -> StandardMaterial3D:
 func _foliage_mat(c: Color, roughness: float, emit: float = 0.0) -> StandardMaterial3D:
 	var m := _mat(c, roughness)
 	m.rim_enabled = true
-	m.rim = 0.4
-	m.rim_tint = 0.35
+	m.rim = 0.12
+	m.rim_tint = 0.6
+	m.metallic_specular = 0.25
 	if emit > 0.0:
 		m.emission_enabled = true
 		m.emission = c.lightened(0.15)
@@ -741,11 +1061,18 @@ func _foliage_mat(c: Color, roughness: float, emit: float = 0.0) -> StandardMate
 
 func _wood_mat(c: Color) -> StandardMaterial3D:
 	var m := _mat(c, 0.78)
-	m.albedo_texture = _cpu_noise_albedo(
-		SEED + 11, 0.22, 128,
-		[c.darkened(0.18), c, c.lightened(0.12)])
+	if ResourceLoader.exists("res://assets/env/textures/bark_albedo.png"):
+		m.albedo_texture = load("res://assets/env/textures/bark_albedo.png")
+		m.albedo_color = c  # tint bark
+		m.normal_enabled = true
+		m.normal_texture = load("res://assets/env/textures/bark_normal.png")
+		m.normal_scale = 0.7
+	else:
+		m.albedo_texture = _cpu_noise_albedo(
+			SEED + 11, 0.22, 128,
+			[c.darkened(0.18), c, c.lightened(0.12)])
 	m.uv1_triplanar = true
-	m.uv1_scale = Vector3(0.4, 0.4, 0.4)
+	m.uv1_scale = Vector3(0.45, 0.45, 0.45)
 	m.roughness = 0.8
 	return m
 
