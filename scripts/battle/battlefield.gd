@@ -3,7 +3,7 @@ extends Node3D
 ## The prototype battlefield, generated deterministically from code (primitives only):
 ## rolling terrain with a central hill and a stream valley, three capture points (A, B, C),
 ## two faction camps, and cover (rocks, palisades, stone walls, huts, a torii, pines,
-## bamboo, grass, dirt roads). Bot 3 v3 — cinematic: terrain shader, Blender pine/hut/torii GLBs.
+## bamboo, grass, dirt roads). Bot 3 v4 — dense leaf-card canopies (GoT-aim): terrain shader, Blender pine/hut/torii GLBs.
 ##
 ## Layout (top view, -Z is north):
 ##                 north camp (faction 1, blue)        z = -128
@@ -59,6 +59,8 @@ var _shrub_mesh: Mesh
 var _rock_mesh: Mesh
 var _hut_scene: PackedScene
 var _torii_scene: PackedScene
+var _palisade_mesh: Mesh
+var _grass_clump_mesh: Mesh
 
 
 func _ready() -> void:
@@ -443,37 +445,41 @@ func _too_close_to_points(p: Vector2, r: float) -> bool:
 
 
 func _build_trees() -> void:
-	# Stylized Japanese pine GLBs (MultiMesh) — replaces primitive cones.
+	# Dense stylized-realistic Japanese pine GLBs (leaf-card + solid canopy plates).
 	var mesh := _pine_mesh if _pine_mesh else EnvMeshes.japanese_pine()
 	var lod := _pine_lod_mesh if _pine_lod_mesh else EnvMeshes.japanese_pine_lod()
 	var near_spots: Array[Vector3] = []
 	var far_spots: Array[Vector3] = []
-	for i in 200:
+	# Hero (dense leaf-card) pines near playable lanes; LOD forest mass on berms/flanks.
+	for i in 480:
 		var side := _rng.randi() % 4
 		var x := _rng.randf_range(-HALF_X + 6, HALF_X - 6)
 		var z := _rng.randf_range(-HALF_Z + 6, HALF_Z - 6)
 		match side:
-			0: x = _rng.randf_range(-HALF_X + 6, -HALF_X + 52)
-			1: x = _rng.randf_range(HALF_X - 52, HALF_X - 6)
-			2: z = _rng.randf_range(-HALF_Z + 6, -HALF_Z + 30)
-			3: z = _rng.randf_range(HALF_Z - 30, HALF_Z - 6)
+			0: x = _rng.randf_range(-HALF_X + 6, -HALF_X + 55)
+			1: x = _rng.randf_range(HALF_X - 55, HALF_X - 6)
+			2: z = _rng.randf_range(-HALF_Z + 6, -HALF_Z + 32)
+			3: z = _rng.randf_range(HALF_Z - 32, HALF_Z - 6)
 		var p := Vector2(x, z)
-		if _too_close_to_points(p, 18.0) or _road_weight(x, z) > 0.45:
+		if _too_close_to_points(p, 16.0) or _road_weight(x, z) > 0.45:
 			continue
-		var gp := ground_point(x, z)
-		# Near midfield groves use high detail; berms use LOD.
-		if absf(x) < HALF_X - 55.0 and absf(z) < HALF_Z - 40.0:
-			near_spots.append(gp)
-		else:
-			far_spots.append(gp)
-	for i in 22:
-		var p := Vector2(_rng.randf_range(22, 44), _rng.randf_range(-18, 18))
-		if _road_weight(p.x, p.y) < 0.4:
+		far_spots.append(ground_point(x, z))
+	# Midfield + west hero groves (dense leaf-card canopies)
+	for i in 72:
+		var p := Vector2(_rng.randf_range(18, 52), _rng.randf_range(-20, 20))
+		if _road_weight(p.x, p.y) < 0.4 and not _too_close_to_points(p, 14.0):
 			near_spots.append(ground_point(p.x, p.y))
-	for i in 14:
-		var p := Vector2(_rng.randf_range(-98, -72), _rng.randf_range(18, 58))
+	for i in 56:
+		var p := Vector2(_rng.randf_range(-105, -65), _rng.randf_range(15, 62))
+		if not _too_close_to_points(p, 14.0):
+			near_spots.append(ground_point(p.x, p.y))
+	for i in 44:
+		var p := Vector2(_rng.randf_range(-45, 45), _rng.randf_range(-115, -80))
 		if not _too_close_to_points(p, 16.0):
 			near_spots.append(ground_point(p.x, p.y))
+	# Cap hero instances for GPU budget; LOD forest carries silhouette mass
+	while near_spots.size() > 110:
+		near_spots.remove_at(near_spots.size() - 1)
 	var pines := _multimesh(mesh, null, near_spots, Vector3.ZERO, 1.0)
 	pines.name = "Pines"
 	var pines_lod := _multimesh(lod, null, far_spots, Vector3.ZERO, 1.05)
@@ -498,18 +504,18 @@ func _build_trees() -> void:
 func _build_shrubs() -> void:
 	var mesh := _shrub_mesh if _shrub_mesh else EnvMeshes.shrub()
 	var spots: Array[Vector3] = []
-	for i in 160:
+	for i in 620:
 		var x := _rng.randf_range(-HALF_X + 18, HALF_X - 18)
 		var z := _rng.randf_range(-HALF_Z + 22, HALF_Z - 22)
 		var p := Vector2(x, z)
 		if _too_close_to_points(p, 14.0) or _road_weight(x, z) > 0.4:
 			continue
-		if _rng.randf() > 0.55:
+		if _rng.randf() > 0.28:
 			continue
 		spots.append(ground_point(x, z))
 	# Clusters near stream banks and grove edges
-	for i in 40:
-		var x := _rng.randf_range(-100, 40)
+	for i in 180:
+		var x := _rng.randf_range(-110, 60)
 		var stream_z := -70.0 + 14.0 * sin(x / 32.0)
 		var z := stream_z + _rng.randf_range(4.0, 10.0) * (1.0 if i % 2 == 0 else -1.0)
 		var p := Vector2(x, z)
@@ -567,37 +573,51 @@ func _build_bamboo() -> void:
 
 
 func _build_grass() -> void:
-	var mesh := EnvMeshes.grass_tuft()
-	var mat := _grass_mat.duplicate()
-	mat.cull_mode = BaseMaterial3D.CULL_DISABLED
-	mat.vertex_color_use_as_albedo = true
+	var mesh := _grass_clump_mesh if _grass_clump_mesh else EnvMeshes.grass_tuft()
+	var wind := ShaderMaterial.new()
+	wind.shader = load("res://assets/env/foliage_wind.gdshader")
+	if ResourceLoader.exists("res://assets/env/textures/grass_blade.png"):
+		wind.set_shader_parameter("albedo_tex", load("res://assets/env/textures/grass_blade.png"))
+	wind.set_shader_parameter("wind_strength", 0.2)
+	wind.set_shader_parameter("wind_speed", 1.7)
+	wind.set_shader_parameter("albedo_tint", Color(0.9, 1.05, 0.85, 1.0))
 	var spots: Array[Vector3] = []
-	for i in 900:
-		var x := _rng.randf_range(-HALF_X + 18, HALF_X - 18)
-		var z := _rng.randf_range(-HALF_Z + 22, HALF_Z - 22)
+	for i in 3800:
+		var x := _rng.randf_range(-HALF_X + 16, HALF_X - 16)
+		var z := _rng.randf_range(-HALF_Z + 20, HALF_Z - 20)
 		var p := Vector2(x, z)
-		if _too_close_to_points(p, 11.0) or _road_weight(x, z) > 0.32:
+		if _too_close_to_points(p, 10.0) or _road_weight(x, z) > 0.3:
 			continue
 		var stream_z := -70.0 + 14.0 * sin(x / 32.0)
-		if absf(z - stream_z) < 3.5:
+		if absf(z - stream_z) < 3.0:
 			continue
-		# Density variation — denser in meadows, thinner on slopes
-		var dens := clampf(_noise.get_noise_2d(x * 0.08, z * 0.08) + 0.55, 0.0, 1.0)
-		if dens < 0.35:
+		var dens := clampf(_noise.get_noise_2d(x * 0.07, z * 0.07) + 0.6, 0.0, 1.0)
+		if dens < 0.14:
 			continue
-		spots.append(ground_point(x, z) + Vector3(0, 0.05, 0))
+		spots.append(ground_point(x, z) + Vector3(0, 0.02, 0))
 	if spots.is_empty():
 		return
+	# Use mesh materials when GLB cards present; wind override only for procedural fallback
+	var mat: Material = null if _grass_clump_mesh else wind
 	var grass := _multimesh(mesh, mat, spots, Vector3.ZERO, 1.0)
 	grass.name = "GrassTufts"
 	grass.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	# Second pass with wind material on a subset for motion (keeps most of GLB look)
+	if _grass_clump_mesh and spots.size() > 80:
+		var wind_spots: Array[Vector3] = []
+		for i in range(0, spots.size(), 3):
+			wind_spots.append(spots[i])
+		var grassy := _multimesh(EnvMeshes.grass_tuft(), wind, wind_spots, Vector3(0, 0.05, 0), 1.1)
+		grassy.name = "GrassWind"
+		grassy.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+
 
 
 func _build_distant_scenery() -> void:
 	# Extra berm silhouettes / distant pine hints outside the playable berm (visual only).
 	var mesh := _pine_lod_mesh if _pine_lod_mesh else EnvMeshes.japanese_pine_lod()
 	var spots: Array[Vector3] = []
-	for i in 48:
+	for i in 72:
 		var ang := _rng.randf() * TAU
 		var radius := maxf(HALF_X, HALF_Z) + _rng.randf_range(8.0, 28.0)
 		var x := cos(ang) * radius * (HALF_X / maxf(HALF_X, HALF_Z))
@@ -607,10 +627,10 @@ func _build_distant_scenery() -> void:
 		z = clampf(z, -HALF_Z - 30.0, HALF_Z + 30.0)
 		if absf(x) < HALF_X - 5.0 and absf(z) < HALF_Z - 5.0:
 			continue
-		spots.append(Vector3(x, height_at(clampf(x, -HALF_X + 1, HALF_X - 1), clampf(z, -HALF_Z + 1, HALF_Z - 1)) + 2.0, z))
+		spots.append(Vector3(x, height_at(clampf(x, -HALF_X + 1, HALF_X - 1), clampf(z, -HALF_Z + 1, HALF_Z - 1)), z))
 	if spots.is_empty():
 		return
-	var distant := _multimesh(mesh, null, spots, Vector3.ZERO, 1.35)
+	var distant := _multimesh(mesh, null, spots, Vector3.ZERO, 1.05)
 	distant.name = "DistantPines"
 	distant.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 
@@ -659,13 +679,36 @@ func _rock(p: Vector3, size: float) -> void:
 
 
 func _palisade(a: Vector2, b: Vector2) -> void:
-	# A row of sharpened stakes (one box per 1.2 m so it follows the ground).
-	var n := maxi(2, ceili(a.distance_to(b) / 1.2))
-	for i in n:
-		var p := a.lerp(b, (i + 0.5) / n)
+	# Prefer Blender palisade kit modules (~4 m); fall back to stake boxes.
+	var yaw := -atan2(b.y - a.y, b.x - a.x)
+	if _palisade_mesh:
+		var dist := a.distance_to(b)
+		var n := maxi(1, ceili(dist / 4.0))
+		for i in n:
+			var p := a.lerp(b, (i + 0.5) / n)
+			var base := ground_point(p.x, p.y)
+			var body := StaticBody3D.new()
+			body.collision_layer = Soldier.LAYER_WORLD
+			body.add_to_group("wood")
+			add_child(body)
+			body.position = base + Vector3(0, 0.05, 0)
+			body.rotation.y = yaw
+			var mi := MeshInstance3D.new()
+			mi.mesh = _palisade_mesh
+			body.add_child(mi)
+			var cs := CollisionShape3D.new()
+			var shape := BoxShape3D.new()
+			shape.size = Vector3(4.0, 2.2, 0.45)
+			cs.shape = shape
+			cs.position.y = 1.1
+			body.add_child(cs)
+		return
+	var n2 := maxi(2, ceili(a.distance_to(b) / 1.2))
+	for i in n2:
+		var p := a.lerp(b, (i + 0.5) / n2)
 		var base := ground_point(p.x, p.y)
 		var stake := _box(base + Vector3(0, 1.0, 0), Vector3(1.25, 2.0, 0.28), _wood, true)
-		stake.rotation.y = -atan2(b.y - a.y, b.x - a.x)
+		stake.rotation.y = yaw
 
 
 func _stone_wall(a: Vector2, b: Vector2) -> void:
@@ -794,6 +837,8 @@ func _load_env_assets() -> void:
 	_pine_lod_mesh = _mesh_from_glb("res://assets/env/meshes/pine_lod.glb")
 	_shrub_mesh = _mesh_from_glb("res://assets/env/meshes/shrub.glb")
 	_rock_mesh = _mesh_from_glb("res://assets/env/meshes/rock.glb")
+	_palisade_mesh = _mesh_from_glb("res://assets/env/meshes/palisade.glb")
+	_grass_clump_mesh = _mesh_from_glb("res://assets/env/meshes/grass_clump.glb")
 	if ResourceLoader.exists("res://assets/env/meshes/hut.glb"):
 		_hut_scene = load("res://assets/env/meshes/hut.glb")
 	if ResourceLoader.exists("res://assets/env/meshes/torii.glb"):

@@ -19,7 +19,10 @@ Kengeki and ASHIGARU were only read from; nothing in those repositories was chan
   procedural primitives generated in-engine for this project (Bot 3). No third-party meshes,
   textures, or sound. See [docs/ENVIRONMENT.md](docs/ENVIRONMENT.md).
 
-- **Environment v3 assets** (`assets/env/meshes/*.glb`, `assets/env/textures/*.png`,
-  `assets/env/terrain_blend.gdshader`, `scripts/battle/env_meshes.gd`): original procedural /
-  Blender-authored content created for this project (Bot 3). No third-party store meshes or
-  photos. Textures are synthetic noise; meshes are primitives arranged into Sengoku silhouettes.
+- **Environment v3/v4 assets** (`assets/env/meshes/*.glb`, `assets/env/textures/*.png`,
+  `assets/env/terrain_blend.gdshader`, `assets/env/foliage_wind.gdshader`,
+  `scripts/battle/env_meshes.gd`): original procedural / Blender-authored content created for
+  this project (Bot 3). No third-party store meshes or photos. Textures are synthetic noise /
+  painted cards; meshes are original primitives arranged into dense Sengoku silhouettes
+  (leaf-card canopies, architecture kits). Stylized-realistic density target — not third-party
+  GoT / Hunyuan assets.
